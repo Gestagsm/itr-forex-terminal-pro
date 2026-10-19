@@ -1,0 +1,99 @@
+:root {
+  color-scheme: dark;
+  --page: #101820;
+  --panel: #17232d;
+  --panel-raised: #1d2a35;
+  --line: #293944;
+  --line-soft: #22313b;
+  --text: #e7eef2;
+  --muted: #8fa1ad;
+  --accent: #55c2d8;
+  --positive: #41c99a;
+  --negative: #ee6c7d;
+  --radius: 10px;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; background: var(--page); color: var(--text); font-size: 13px; }
+a { color: var(--accent); text-decoration: none; }
+button, input, select { font: inherit; }
+button, select { cursor: pointer; }
+
+.topbar {
+  min-height: 76px; display: flex; align-items: center; gap: 22px; padding: 12px 22px;
+  background: #131e27; border-bottom: 1px solid var(--line); flex-wrap: wrap;
+}
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; padding: 12px 20px; background: #131e27; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.logo { color: var(--accent); font-size: 12px; font-weight: 750; letter-spacing: .06em; }
+.brand { display: flex; align-items: center; gap: 11px; min-width: 182px; color: var(--text); }
+.brand-mark { width: 37px; height: 37px; display: grid; place-items: center; border-radius: 11px; background: var(--accent); color: #0d2028; font-weight: 900; font-size: 23px; }
+.brand strong, .brand small { display: block; letter-spacing: .08em; }
+.brand strong { font-size: 12px; }
+.brand small { margin-top: 4px; color: var(--muted); font-size: 9px; }
+.metrics { display: flex; align-items: center; gap: 25px; flex: 1; flex-wrap: wrap; }
+.metrics div { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.metrics b { display: block; margin-top: 5px; color: var(--text); font: 600 14px "Segoe UI", sans-serif; letter-spacing: 0; }
+.top-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
+.feed-status, .sessions { display: flex; align-items: center; gap: 4px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 7px 11px;
+  color: var(--text); background: var(--panel-raised); border: 1px solid var(--line); border-radius: 7px;
+  font-size: 11px; font-weight: 600; white-space: nowrap; transition: border-color .15s, background .15s;
+}
+.btn:hover { border-color: #527180; background: #253640; }
+.btn.green { color: #d8fff1; background: #17483c; border-color: #246b57; }
+.btn.red { color: #ffe7ea; background: #542a33; border-color: #81414b; }
+.btn.blue { color: #0f242b; background: var(--accent); border-color: var(--accent); }
+.btn.sm { min-height: 27px; padding: 4px 8px; font-size: 10px; }
+.btn.robot-control { color: var(--accent); }
+.btn.robot-control.green { color: #d8fff1; }
+.btn.robot-control.red { color: #ffe7ea; }
+
+.box { min-width: 0; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 8px 22px #0710171c; }
+.box h2 { margin: 3px 0 0; font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+.box h3 { margin: 0 0 12px; padding-bottom: 8px; color: var(--muted); border-bottom: 1px solid var(--line); font-size: 10px; letter-spacing: .09em; text-transform: uppercase; }
+.eyebrow { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .13em; }
+.section-heading, .bottom-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 15px; }
+.muted, .mut { color: var(--muted); }
+.up { color: var(--positive) !important; }
+.down { color: var(--negative) !important; }
+.tag, .demo-tag { padding: 4px 7px; color: #bcebf2; background: #203c46; border: 1px solid #2e5864; border-radius: 5px; font-size: 9px; font-weight: 700; letter-spacing: .07em; }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; color: var(--muted); background: #202d36; border-radius: 99px; font-size: 10px; white-space: nowrap; }
+.pill.on { color: #aaf0d2; background: #173f35; }
+.pill.off { color: #ffc0c8; background: #4a2931; }
+.fp { padding: 4px 6px; border-radius: 5px; background: #293640; color: var(--muted); font-size: 9px; }
+.fp.ok { color: #aaf0d2; background: #173f35; }
+.fp.bad { color: #ffc0c8; background: #4a2931; }
+
+input, select {
+  min-height: 34px; padding: 7px 9px; color: var(--text); background: #111b23; border: 1px solid var(--line); border-radius: 6px; outline: none;
+}
+input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px #55c2d822; }
+label { color: var(--muted); }
+
+table { width: 100%; border-collapse: collapse; color: var(--text); font: 11px "Cascadia Code", Consolas, monospace; text-align: left; }
+th, td { padding: 9px 10px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+th { position: sticky; top: 0; z-index: 1; color: var(--muted); background: var(--panel); font: 700 9px "Segoe UI", sans-serif; text-transform: uppercase; letter-spacing: .08em; }
+tbody tr:hover { background: #ffffff06; }
+.tw { overflow: auto; max-height: 340px; border: 1px solid var(--line-soft); border-radius: 7px; }
+.row { display: flex; align-items: center; gap: 9px; margin: 9px 0; flex-wrap: wrap; }
+.row input { flex: 1; min-width: 140px; }
+.err { color: var(--negative); font-size: 11px; }
+.okm { color: var(--positive); font-size: 11px; }
+
+.modal { position: fixed; inset: 0; z-index: 99; display: none; align-items: center; justify-content: center; padding: 18px; background: #071017d9; }
+.modal.show { display: flex; }
+.mbox { width: min(720px, 96vw); max-height: 90vh; overflow: auto; padding: 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.mbox h2 { margin: 0 0 7px; font-size: 18px; }
+.dirs { max-height: 240px; overflow: auto; margin: 8px 0; border: 1px solid var(--line); border-radius: 7px; }
+.dirs div { padding: 8px 10px; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
+.dirs div:hover { background: var(--panel-raised); }
+
+@media (max-width: 780px) {
+  .bar { padding: 11px 14px; }
+  .topbar { gap: 12px; padding: 12px 14px; }
+  .brand { min-width: 150px; }
+  .metrics { order: 3; flex-basis: 100%; justify-content: space-between; gap: 12px; }
+  .top-actions { flex: 1; }
+}

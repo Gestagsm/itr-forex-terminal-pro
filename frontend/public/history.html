@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="so">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>History — TAQ · TAS · GCV</title>
+<link rel="stylesheet" href="ui.css?v=20261007-3"><script src="common.js?v=20261007-3"></script></head>
+<body>
+<div class="bar"><div class="logo">📜 HISTORY — TAQ · TAS · GCV</div><div style="display:flex;gap:8px"><a class="btn blue" href="index.html">⬅ Terminal</a><a class="btn" href="data.html">📡 Feed</a><button class="btn" onclick="openFolders()">📁 Folders</button></div></div>
+<div style="padding:14px;display:flex;flex-direction:column;gap:12px;max-width:1500px;margin:auto">
+  <div class="box"><h3>Xogta kaydsan</h3><div id="dbstate" class="mut" role="status">Hubinaya PostgreSQL…</div><div id="counts" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px"></div></div>
+  <div class="box">
+    <h3>Raadi history</h3>
+    <div id="dsTabs" style="display:flex;gap:6px;margin-bottom:10px"></div>
+    <div class="row" style="flex-wrap:wrap">
+      <label>Suuq</label><select id="sym"></select>
+      <label>Laga bilaabo</label><input type="date" id="d1"><input type="time" step="1" id="t1" value="00:00:00">
+      <label>Ilaa</label><input type="date" id="d2"><input type="time" step="1" id="t2" value="23:59:59">
+      <button class="btn blue" id="go">🔍 Raadi</button><a class="btn" id="csv" href="#">⬇ CSV</a>
+    </div>
+    <div class="row" style="flex-wrap:wrap"><span class="mut">Degdeg:</span>
+      <button class="btn sm" data-q="5m">5 daqiiqo ee u dambeeyay</button><button class="btn sm" data-q="1h">1 saac</button><button class="btn sm" data-q="today">Maanta</button><button class="btn sm" data-q="all">Dhammaan</button>
+      <span class="mut" style="margin-left:12px">Maalmaha jira:</span><span id="chips"></span></div>
+    <div id="sum" class="mut" style="margin:8px 0"></div>
+    <div class="tw" style="max-height:420px"><table><thead id="th"></thead><tbody id="tb"></tbody></table></div>
+    <div class="row" style="justify-content:center"><button class="btn sm" id="prev">⬅</button><span id="pg" class="mut"></span><button class="btn sm" id="next">➡</button></div>
+  </div>
+  <div class="box"><h3>🎯 Rate-ka suuq kasta waqti la doorto (sidii uu ahaa)</h3>
+    <div class="row"><input type="date" id="ad"><input type="time" step="1" id="at"><button class="btn blue" id="ago">Muuji rate-ka</button><span class="mut">quote-kii u dambeeyay ee waqtigaas ama ka hor</span><span id="atsource" class="mut"></span></div>
+    <table><thead><tr><th>Suuq</th><th>Bid</th><th>Ask</th><th>Quote-ka waqtigiisa</th></tr></thead><tbody id="atb"></tbody></table></div>
+  <div class="box"><h3>Block-yada (4-saac) — <span id="bt"></span></h3>
+    <div class="tw"><table><thead><tr><th>Block</th><th>Bilow</th><th>Dhammaad</th><th>Size</th><th>Xaalad</th><th>Fayl</th></tr></thead><tbody id="bl"></tbody></table></div></div>
+</div>
+<script src="folders.js?v=20261007-3"></script><script src="history.js?v=20261007-3"></script>
+</body></html>

@@ -1,0 +1,22 @@
+{
+  "name": "itr-forex-terminal",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Professional full-stack simulated forex terminal with an independent Node.js backend and browser frontend.",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "start:admin": "node backend/admin-server.js",
+    "backtest": "node backend/backtest.js 14 3",
+    "check": "node --check backend/server.js && node --check backend/admin-server.js && node --check backend/database.js && node --check backend/broker.js && node --check backend/robot.js && node --check backend/market.js && node --check backend/backtest.js && node --check frontend/public/trader.js && node --check admin/public/admin.js",
+    "test": "node --test backend/test/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "pg": "^8.23.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
+}

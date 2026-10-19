@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="ITR Terminal standalone administration portal">
+  <title>ITR Control Center</title>
+  <link rel="stylesheet" href="/admin.css">
+  <script src="/admin.js" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+  <main class="shell">
+    <section id="login-view" class="login-layout" hidden>
+      <div class="brand-panel">
+        <div class="brand-mark">ITR</div>
+        <p class="eyebrow">CONTROL PLANE</p>
+        <h1>One secure place to manage your trading platform.</h1>
+        <p class="subtle">Monitor terminal services, market data and integrations independently from the trading workspace.</p>
+        <div class="security-note"><span class="secure-icon">◆</span><span>Administrator access is isolated from the trader terminal.</span></div>
+      </div>
+      <form id="login-form" class="login-card">
+        <p class="eyebrow">ADMINISTRATOR SIGN IN</p>
+        <h2>Welcome back</h2>
+        <p class="subtle">Sign in with the credentials configured for this admin service.</p>
+        <label for="username">Username</label><input id="username" name="username" autocomplete="username" required>
+        <label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required>
+        <button class="primary" type="submit">Sign in <span aria-hidden="true">→</span></button>
+        <p id="login-error" class="error" role="alert"></p>
+        <small class="subtle">Use HTTPS through a trusted reverse proxy before remote access.</small>
+      </form>
+    </section>
+
+    <section id="dashboard-view" hidden>
+      <header class="topbar">
+        <a class="wordmark" href="/" aria-label="ITR Control Center home"><span class="mark-small">I</span><span>ITR <b>CONTROL CENTER</b></span></a>
+        <div class="top-right"><span id="connection" class="status"><i></i> Connecting</span><span id="admin-user" class="user-chip"></span><button id="logout" class="quiet-button" type="button">Sign out</button></div>
+      </header>
+      <nav class="portal-nav" aria-label="Admin sections">
+        <button class="nav-item active" data-view="overview" type="button">Overview</button>
+        <button class="nav-item" data-view="profile" type="button">Profile</button>
+        <button class="nav-item" data-view="settings" type="button">API settings</button>
+      </nav>
+      <section id="view-overview" class="portal-view">
+      <div class="page-heading"><div><p class="eyebrow">PLATFORM OPERATIONS</p><h1>Administration</h1><p class="subtle">A dedicated control center, separate from the trader application.</p></div><button id="refresh" class="quiet-button" type="button">↻ &nbsp;Refresh</button></div>
+      <section class="metrics" aria-label="Platform status">
+        <article class="metric"><div class="metric-label">TRADING ENGINE</div><strong id="terminal-state">Loading</strong><small id="terminal-detail">--</small></article>
+        <article class="metric"><div class="metric-label">DATABASE</div><strong id="database-state">Loading</strong><small id="database-detail">--</small></article>
+        <article class="metric"><div class="metric-label">DEMO ACCOUNT</div><strong id="account-state">Loading</strong><small id="account-detail">--</small></article>
+        <article class="metric"><div class="metric-label">AUTOMATION</div><strong id="robot-state">Loading</strong><small id="robot-detail">--</small><button id="robot-toggle" class="inline-action" type="button" disabled>Loading</button></article>
+      </section>
+
+      <section class="section">
+        <div class="section-heading"><div><p class="eyebrow">CONNECTED SERVICES</p><h2>AI &amp; broker integrations</h2></div><span class="badge neutral">Provider selection required</span></div>
+        <div class="integration-grid">
+          <article class="integration"><div class="integration-icon ai-icon">✳</div><div><h3>AI intelligence</h3><span id="ai-integration-state" class="badge neutral">Not configured</span></div><p id="ai-integration-detail">Choose an AI provider and define its role before enabling trading decisions.</p><small>Credentials stay on the admin backend; provider adapters are not active.</small></article>
+          <article class="integration"><div class="integration-icon broker-icon">⌁</div><div><h3>Forex broker</h3><span id="broker-integration-state" class="badge neutral">Simulator only</span></div><p id="broker-integration-detail">The terminal currently uses its built-in demo broker. No external broker or live order route is active.</p><small>Broker adapters should be validated with a demo account and explicit risk limits.</small></article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading"><div><p class="eyebrow">OBSERVABILITY</p><h2>Market data pipelines</h2></div><span id="feed-summary" class="subtle"></span></div>
+        <div id="feed-list" class="feed-grid"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+      </section>
+      <p id="dashboard-error" class="error" role="status" aria-live="polite"></p>
+      </section>
+
+      <section id="view-profile" class="portal-view" hidden>
+        <div class="page-heading"><div><p class="eyebrow">ACCOUNT SECURITY</p><h1>Profile</h1><p class="subtle">Update the administrator sign-in used by this standalone portal.</p></div></div>
+        <div class="settings-grid">
+          <article class="settings-card">
+            <p class="eyebrow">ADMINISTRATOR ACCOUNT</p><h2>Profile &amp; password</h2>
+            <form id="profile-form" class="form-grid">
+              <label for="profile-username">Username</label><input id="profile-username" autocomplete="username" minlength="3" maxlength="64" required>
+              <label for="profile-current-password">Current password <span class="required">*</span></label><input id="profile-current-password" type="password" autocomplete="current-password" required>
+              <label for="profile-new-password">New password</label><input id="profile-new-password" type="password" autocomplete="new-password" minlength="14" maxlength="256" placeholder="Leave empty to keep current password">
+              <label for="profile-confirm-password">Confirm new password</label><input id="profile-confirm-password" type="password" autocomplete="new-password" minlength="14" maxlength="256" placeholder="Repeat the new password">
+              <div class="form-actions"><button class="primary compact" type="submit">Save profile</button><span id="profile-message" class="form-message" role="status"></span></div>
+            </form>
+            <p class="help-text">Saving changes revokes other admin sessions and keeps this browser signed in.</p>
+          </article>
+          <aside class="settings-card security-card"><p class="eyebrow">SECURITY</p><h2>Session protection</h2>
+            <ul><li>Password is stored as a salted, slow hash.</li><li>Provider secrets are encrypted at rest using the admin password.</li><li>Sign-in is rate-limited; session cookies are HttpOnly and SameSite.</li></ul>
+            <p class="warning-note">Keep the portal on this trusted machine. Use HTTPS through a trusted proxy before remote access.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section id="view-settings" class="portal-view" hidden>
+        <div class="page-heading"><div><p class="eyebrow">PLATFORM CONFIGURATION</p><h1>API settings</h1><p class="subtle">Manage provider selections and securely store credentials for later adapter setup.</p></div></div>
+        <div class="notice"><b>Configuration only · not connected</b><span>Saving keys does not activate AI decisions, broker connectivity or live orders. Provider adapters must be implemented and explicitly enabled separately.</span></div>
+        <form id="settings-form">
+          <div class="settings-grid">
+            <article class="settings-card"><div class="settings-title"><div><p class="eyebrow">AI PROVIDER</p><h2>Artificial intelligence</h2></div><span class="badge neutral">Adapter not installed</span></div>
+              <label for="ai-provider">Provider</label><select id="ai-provider"><option value="none">Not configured</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="google">Google Gemini</option></select>
+              <label for="ai-model">Model identifier</label><input id="ai-model" maxlength="120" placeholder="Provider model name">
+              <label for="ai-api-key">API key <span id="ai-key-status" class="key-status"></span></label><input id="ai-api-key" type="password" autocomplete="new-password" maxlength="4096" placeholder="Enter a key to replace the stored key">
+              <label class="check-row"><input id="ai-clear-key" type="checkbox"> Remove stored AI API key</label>
+            </article>
+            <article class="settings-card"><div class="settings-title"><div><p class="eyebrow">BROKER CONNECTION</p><h2>Forex broker</h2></div><span class="badge neutral">Adapter not installed</span></div>
+              <label for="broker-provider">Provider</label><select id="broker-provider"><option value="simulated">Built-in simulator</option><option value="oanda">OANDA</option><option value="interactive-brokers">Interactive Brokers</option><option value="metatrader5">MetaTrader 5</option></select>
+              <label for="broker-environment">Environment</label><select id="broker-environment"><option value="demo">Demo / practice</option><option value="live">Live · not enabled</option></select>
+              <label for="broker-account">Account identifier</label><input id="broker-account" maxlength="160" autocomplete="off" placeholder="Optional account ID">
+              <label for="broker-api-key">API key <span id="broker-key-status" class="key-status"></span></label><input id="broker-api-key" type="password" autocomplete="new-password" maxlength="4096" placeholder="Enter a key to replace the stored key">
+              <label for="broker-access-token">Access token <span id="broker-token-status" class="key-status"></span></label><input id="broker-access-token" type="password" autocomplete="new-password" maxlength="4096" placeholder="Enter a token to replace the stored token">
+              <label class="check-row"><input id="broker-clear-key" type="checkbox"> Remove stored broker API key</label>
+              <label class="check-row"><input id="broker-clear-token" type="checkbox"> Remove stored broker access token</label>
+            </article>
+          </div>
+          <div class="form-actions settings-actions"><button class="primary compact" type="submit">Save API settings</button><span id="settings-message" class="form-message" role="status"></span></div>
+        </form>
+      </section>
+      <footer><span>ITR CONTROL CENTER</span><span>Isolated admin service · <span id="last-updated">Awaiting data</span></span></footer>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101820">
+  <meta name="description" content="ITR simulated forex trading terminal">
+  <title>ITR Terminal · Simulated Markets</title>
+  <link rel="stylesheet" href="ui.css?v=20261009-5">
+  <link rel="stylesheet" href="trader.css?v=20261009-5">
+  <script src="common.js?v=20261009-5"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="ITR Terminal home">
+      <span class="brand-mark" aria-hidden="true">I</span>
+      <span><strong>ITR TERMINAL</strong><small>SIMULATED MARKETS</small></span>
+    </a>
+    <div class="metrics" id="metrics" aria-label="Account overview"></div>
+    <nav class="top-actions" aria-label="Main navigation">
+      <span id="fstat" class="feed-status" aria-label="Feed status"></span>
+      <span id="dbstat" aria-label="Database status"></span>
+      <span id="conn" class="pill" role="status">Connecting…</span>
+      <button class="btn robot-control" id="robotBtn" type="button">Robot</button>
+      <button class="btn" onclick="openFolders()" type="button">Folders</button>
+      <a class="btn" href="history.html">History</a>
+      <a class="btn" href="data.html">Data feed</a>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <aside class="left">
+      <section class="box watchbox">
+        <div class="section-heading"><div><span class="eyebrow">MARKETS</span><h2>Market watch</h2></div><span id="sess" class="sessions" aria-label="Market sessions"></span></div>
+        <div class="watch-head"><span>Instrument</span><span>Bid</span><span>Ask</span><span>Day</span></div>
+        <div id="watch" class="watch-list" aria-label="Available simulated markets"></div>
+      </section>
+
+      <section class="box ticket">
+        <div class="section-heading"><div><span class="eyebrow">TRADE</span><h2>Order ticket <span class="muted">· <span id="tsym">—</span></span></h2></div><span class="demo-tag">DEMO</span></div>
+        <div class="irow"><label for="otype">Order type</label><select id="otype"><option value="MARKET">Market</option><option value="LIMIT">Limit</option><option value="STOP">Stop</option></select></div>
+        <div class="irow" id="prow" style="display:none"><label for="oprice">Entry price</label><input id="oprice" type="number" step="any"></div>
+        <div class="irow"><label for="olots">Volume (lots)</label><input id="olots" type="number" value="0.10" step="0.01" min="0.01" max="100"></div>
+        <div class="irow"><label for="osl">Stop loss (pips)</label><input id="osl" type="number" value="0" min="0" step="1"></div>
+        <div class="irow"><label for="otp">Take profit (pips)</label><input id="otp" type="number" value="0" min="0" step="1"></div>
+        <div class="trade">
+          <button class="sell" id="bsell" type="button">SELL <small id="psell">—</small></button>
+          <button class="buy" id="bbuy" type="button">BUY <small id="pbuy">—</small></button>
+        </div>
+        <div id="omsg" class="order-message" role="status" aria-live="polite"></div>
+        <p class="risk-note">Practice environment only. Prices and execution are simulated.</p>
+      </section>
+    </aside>
+
+    <section class="mid" aria-label="Trading workspace">
+      <section class="box chartbox">
+        <div class="ctool">
+          <div class="instrument-title"><span class="eyebrow">PRICE CHART</span><b id="csym">—</b></div>
+          <span id="cpx" class="chart-price"></span>
+          <span class="toolbar-spacer"></span>
+          <div id="tfs" class="timeframes" aria-label="Chart timeframe"></div>
+        </div>
+        <div class="chart-nav">
+          <label for="chart-from">From</label><input type="date" id="chart-from">
+          <label for="chart-to">To</label><input type="date" id="chart-to">
+          <button class="btn sm" id="chart-load" type="button">Load range</button>
+          <button class="btn sm" id="chart-back" type="button" aria-label="Previous candle">‹</button>
+          <button class="btn sm" id="chart-play" type="button">Replay</button>
+          <button class="btn sm" id="chart-forward" type="button" aria-label="Next candle">›</button>
+          <button class="btn sm" id="chart-live" type="button">Live</button>
+          <span id="chart-status" class="mut" role="status" aria-live="polite"></span>
+        </div>
+        <div class="cwrap"><canvas id="cv" aria-label="Simulated market candlestick chart"></canvas><div id="ohlc"></div></div>
+      </section>
+
+      <section class="box bottom">
+        <div class="bottom-heading"><div><span class="eyebrow">ACCOUNT</span><h2>Trading activity</h2></div>
+          <div class="tabs" id="tabs" role="tablist">
+            <span data-t="pos" class="on" role="tab">Positions</span>
+            <span data-t="ord" role="tab">Pending orders</span>
+            <span data-t="his" role="tab">History</span>
+            <span data-t="rob" role="tab">Robot</span>
+            <span data-t="sta" role="tab">Statistics</span>
+          </div>
+        </div>
+        <div class="tabc" id="tabc"></div>
+      </section>
+    </section>
+  </main>
+  <script src="folders.js?v=20261009-4"></script>
+  <script src="trader.js?v=20261009-5"></script>
+</body>
+</html>

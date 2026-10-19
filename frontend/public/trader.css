@@ -1,0 +1,91 @@
+.layout { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 14px; min-height: calc(100vh - 76px); padding: 14px; }
+.left, .mid { display: flex; min-width: 0; flex-direction: column; gap: 14px; }
+.left { align-self: start; }
+.watchbox { padding: 15px 12px 12px; }
+.watch-head { display: grid; grid-template-columns: minmax(88px, 1.1fr) 1fr 1fr 46px; gap: 5px; padding: 0 8px 8px; color: var(--muted); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.watch-head span:not(:first-child) { text-align: right; }
+.watch-list { display: grid; gap: 4px; }
+.pair {
+  display: grid; grid-template-columns: minmax(88px, 1.1fr) 1fr 1fr 46px; gap: 5px; align-items: center;
+  min-height: 52px; padding: 8px; color: var(--muted); background: transparent; border: 1px solid transparent;
+  border-radius: 7px; cursor: pointer; font: 11px "Cascadia Code", Consolas, monospace;
+}
+.pair:hover { background: #ffffff06; border-color: var(--line); }
+.pair.active { color: var(--text); background: #1b3540; border-color: #315562; }
+.pair b { color: var(--text); font: 650 11px "Segoe UI", sans-serif; }
+.pair .px { text-align: right; }
+.pair > span:nth-of-type(3) { text-align: right; }
+.pair .pl { grid-column: 1 / -1; display: flex; justify-content: space-between; padding-top: 5px; border-top: 1px solid var(--line); color: var(--muted); font: 10px "Segoe UI", sans-serif; }
+
+.ticket { padding: 17px; }
+.ticket .irow { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 9px; }
+.ticket .irow label { font-size: 11px; }
+.ticket .irow input, .ticket .irow select { width: 142px; text-align: right; }
+.trade { display: flex; gap: 9px; margin-top: 14px; }
+.trade button { flex: 1; min-height: 58px; padding: 9px; color: white; border: 1px solid transparent; border-radius: 8px; font-size: 12px; font-weight: 800; letter-spacing: .05em; cursor: pointer; }
+.trade button:hover { filter: brightness(1.12); }
+.trade .sell { background: #6b303c; border-color: #86414e; }
+.trade .buy { background: #17644d; border-color: #268266; }
+.trade small { display: block; margin-top: 4px; font: 11px "Cascadia Code", Consolas, monospace; letter-spacing: 0; }
+.order-message { min-height: 17px; margin-top: 9px; }
+.risk-note { margin: 8px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+
+.chartbox { display: flex; min-height: 390px; height: min(51vh, 570px); flex-direction: column; padding: 15px 17px 12px; }
+.ctool { display: flex; min-height: 48px; align-items: center; gap: 12px; margin-bottom: 9px; flex-wrap: wrap; }
+.instrument-title { display: flex; min-width: 120px; flex-direction: column; gap: 3px; }
+.instrument-title b { font-size: 15px; }
+.chart-price { font: 600 12px "Cascadia Code", Consolas, monospace; }
+.toolbar-spacer { flex: 1; }
+.timeframes { display: flex; align-items: center; gap: 3px; }
+.timeframes .tf { padding: 6px 8px; color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 5px; cursor: pointer; font-size: 10px; }
+.timeframes .tf:hover { border-color: var(--line); }
+.timeframes .tf.on { color: #b9edf4; background: #203c46; border-color: #315562; font-weight: 700; }
+.chart-nav { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; flex-wrap: wrap; }
+.chart-nav label { color: var(--muted); font-size: 10px; }
+.chart-nav input { width: 132px; padding: 5px 7px; font-size: 10px; }
+.chart-nav #chart-status { font-size: 10px; }
+.cwrap { position: relative; min-height: 0; flex: 1; }
+canvas#cv { position: absolute; inset: 0; width: 100%; height: 100%; background: #111a22; border: 1px solid var(--line-soft); border-radius: 7px; }
+#ohlc { position: absolute; top: 9px; left: 12px; color: var(--muted); font: 10px "Cascadia Code", Consolas, monospace; pointer-events: none; }
+
+.bottom { display: flex; min-height: 285px; flex: 1; flex-direction: column; padding: 15px 17px; }
+.bottom-heading { align-items: flex-end; margin-bottom: 8px; flex-wrap: wrap; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.tabs span { padding: 8px 9px; color: var(--muted); border-bottom: 2px solid transparent; cursor: pointer; font-size: 10px; }
+.tabs span:hover { color: var(--text); }
+.tabs span.on { color: var(--accent); border-color: var(--accent); }
+.tabc { min-height: 0; flex: 1; overflow: auto; }
+.tabc > div > .btn { margin-bottom: 5px; }
+.rgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 9px; margin-bottom: 10px; }
+.rgrid label { display: block; margin-bottom: 4px; color: var(--muted); font-size: 10px; }
+.rgrid input, .rgrid select { width: 100%; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 7px; margin-bottom: 9px; }
+.cards div { padding: 9px 10px; color: var(--muted); background: #111b23; border: 1px solid var(--line-soft); border-radius: 7px; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; }
+.cards b { display: block; margin-top: 5px; color: var(--text); font-size: 14px; letter-spacing: 0; }
+.logl { max-height: 135px; overflow: auto; padding: 7px 9px; background: #111b23; border-radius: 7px; }
+.logl div { padding: 4px 0; border-bottom: 1px solid var(--line-soft); font: 10px "Cascadia Code", Consolas, monospace; }
+.logl .trade { color: var(--positive); }
+.logl .halt { color: var(--negative); }
+.logl .manage { color: var(--accent); }
+.logl .skip { color: var(--muted); }
+
+@media (max-width: 1020px) {
+  .layout { grid-template-columns: 280px minmax(0, 1fr); }
+  .metrics { gap: 14px; }
+}
+@media (max-width: 760px) {
+  .layout { display: flex; min-height: 0; flex-direction: column; padding: 10px; }
+  .left { display: grid; grid-template-columns: 1fr; }
+  .chartbox { height: 430px; min-height: 350px; }
+  .chart-nav { gap: 4px; }
+  .chart-nav input { width: 118px; }
+  .bottom { min-height: 310px; }
+}
+@media (max-width: 440px) {
+  .chartbox { height: 370px; padding: 12px; }
+  .ctool { gap: 5px; }
+  .timeframes .tf { padding: 5px 6px; }
+  .bottom-heading { align-items: flex-start; }
+  .tabs { width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  .tabs span { flex: 0 0 auto; }
+}
