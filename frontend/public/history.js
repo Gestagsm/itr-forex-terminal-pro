@@ -36,5 +36,8 @@
     $('atsource').textContent = r.source === 'postgresql' ? '· PostgreSQL' : '· kayd maxalli ah';
     $('atb').innerHTML = Object.entries(r.rates).map(([k, v]) => v ? `<tr><td><b>${v.label}</b></td><td>${v.bid.toFixed(v.dig)}</td><td>${v.ask.toFixed(v.dig)}</td><td class="mut">${v.time}</td></tr>` : `<tr><td>${k}</td><td colspan="3" class="mut">xog ma jirto waqtigaas</td></tr>`).join('') };
   $('ad').value = dstr(new Date()); $('at').value = new Date(Date.now() - 60000).toTimeString().slice(0, 8);
-  init();
+  window.itrAuthReady.then(() => {
+    if (window.itrHasPrivateAccess()) init();
+  });
+  window.addEventListener('itr-authenticated', init);
 })();

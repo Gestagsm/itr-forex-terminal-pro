@@ -12,6 +12,130 @@
   document.addEventListener('DOMContentLoaded', () => document.body.appendChild(ov));
   const show = m => { ov.style.display = 'flex'; ov.querySelector('#ovmsg').innerHTML = m || '' }, hide = () => { ov.style.display = 'none' };
   if (location.protocol === 'file:') { document.addEventListener('DOMContentLoaded', () => show('<b>Faylkan si toos ah ayaad u furtay (file://).</b> Waa inaad marka hore server-ka shido.')); return }
-  const of = window.fetch; let fails = 0;
-  window.fetch = (...a) => of(...a).then(r => { fails = 0; hide(); return r }).catch(e => { if (++fails >= 2) show('Isku-xirka server-ka waa go\'ay.'); throw e });
+  const of = window.fetch; let fails = 0, authState = false, authConfigured = false, authPrompt = null;
+  const updateAuthButtons = () => document.querySelectorAll('[data-api-auth]').forEach(button => {
+    button.textContent = authState ? 'Sign out' : authConfigured ? 'Sign in for private data' : 'Private controls unavailable';
+    button.disabled = !authState && !authConfigured;
+    button.setAttribute('aria-label', authState ? 'Sign out of private terminal access' : 'Sign in for private terminal access');
+  });
+  const updatePrivateControls = () => {
+    if (document.body) document.body.classList.toggle('api-authenticated', authState);
+    document.querySelectorAll('[data-private-control], .private-controls button, .private-controls input, .private-controls select').forEach(control => {
+      control.disabled = !authState;
+    });
+  };
+  function requestAccess() {
+    if (authState) return Promise.resolve(true);
+    if (!authConfigured) return Promise.resolve(false);
+    if (authPrompt) return authPrompt;
+    authPrompt = new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(8,10,13,.78);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;font-family:Segoe UI,Arial,sans-serif';
+      overlay.innerHTML = `<form style="width:min(420px,100%);background:#161b22;border:1px solid #39434d;border-radius:10px;padding:22px;color:#e1e4e6">
+        <h2 style="margin:0 0 8px">Private terminal access</h2>
+        <p style="color:#9aa6b2;font-size:13px">Enter the API_TOKEN configured by the terminal operator. Public market prices and charts do not require sign-in.</p>
+        <label for="itr-api-token">Access credential</label>
+        <input id="itr-api-token" type="password" autocomplete="current-password" required style="display:block;box-sizing:border-box;width:100%;margin:6px 0 10px;padding:10px;background:#0c0f12;color:#e1e4e6;border:1px solid #39434d;border-radius:5px">
+        <div data-auth-error role="alert" style="min-height:18px;color:#ff6b81;font-size:13px;margin-bottom:8px"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" data-auth-cancel>Cancel</button><button type="submit">Sign in</button></div>
+      </form>`;
+      const form = overlay.querySelector('form'), input = overlay.querySelector('input'), message = overlay.querySelector('[data-auth-error]');
+      let finished = false;
+      const finish = value => {
+        if (finished) return;
+        finished = true;
+        overlay.remove();
+        authPrompt = null;
+        resolve(value);
+      };
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const submit = form.querySelector('[type="submit"]');
+        submit.disabled = true;
+        message.textContent = '';
+        try {
+          const response = await of('/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: input.value })
+          });
+          const result = await response.json();
+          if (!response.ok) { message.textContent = result.error || 'Sign-in failed.'; return }
+          authState = true;
+          updateAuthButtons();
+          updatePrivateControls();
+          window.dispatchEvent(new Event('itr-authenticated'));
+          finish(true);
+        } catch (error) {
+          message.textContent = error.message;
+        } finally {
+          if (!finished) submit.disabled = false;
+        }
+      });
+      form.querySelector('[data-auth-cancel]').addEventListener('click', () => finish(false));
+      document.body.appendChild(overlay);
+      input.focus();
+    });
+    return authPrompt;
+  }
+  window.requestIAuth = requestAccess;
+  window.itrHasPrivateAccess = () => authState;
+  window.itrAuthReady = of('/auth/session').then(response => response.json()).then(result => {
+    authState = result.authenticated === true;
+    authConfigured = result.configured === true;
+    updateAuthButtons();
+    updatePrivateControls();
+  }).catch(() => {});
+  function authPath(input) {
+    try { return new URL(typeof input === 'string' ? input : input.url, location.href).pathname }
+    catch { return '' }
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-api-auth]').forEach(button => button.addEventListener('click', async () => {
+      if (!authState) return requestAccess();
+      try {
+        const response = await of('/auth/logout', { method: 'POST' });
+        if (!response.ok && response.status !== 401) return;
+        authState = false;
+        updateAuthButtons();
+        updatePrivateControls();
+        window.dispatchEvent(new Event('itr-logged-out'));
+      } catch (error) { show(error.message) }
+    }));
+    updateAuthButtons();
+    updatePrivateControls();
+    new MutationObserver(updatePrivateControls).observe(document.body, { childList: true, subtree: true });
+    document.addEventListener('click', async event => {
+      const link = event.target.closest('a[href]');
+      if (!link) return;
+      const url = new URL(link.href, location.href);
+      if (!(url.pathname.startsWith('/download/') || url.pathname.startsWith('/export/')
+        || url.pathname === '/history/query' && url.searchParams.get('format') === 'csv') || authState) return;
+      event.preventDefault();
+      if (await requestAccess()) location.assign(url.href);
+    });
+    window.itrAuthReady.then(() => { updateAuthButtons(); updatePrivateControls() });
+  });
+  window.fetch = async (...args) => {
+    try {
+      let response = await of(...args);
+      const path = authPath(args[0]);
+      if (response.status === 401 && !path.startsWith('/auth/')) {
+        if (authState) {
+          authState = false;
+          updateAuthButtons();
+          updatePrivateControls();
+          window.dispatchEvent(new Event('itr-logged-out'));
+        }
+        if (authConfigured && window.navigator.userActivation && window.navigator.userActivation.isActive
+          && await requestAccess()) response = await of(...args);
+      }
+      fails = 0;
+      hide();
+      return response;
+    } catch (error) {
+      if (++fails >= 2) show('Isku-xirka server-ka waa go\'ay.');
+      throw error;
+    }
+  };
 })();

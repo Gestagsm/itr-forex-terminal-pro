@@ -6,7 +6,7 @@
  * - 4-saac kasta: fayl Excel (.xlsx) + archive (.gz) oo History page-ku akhriyo
  * - broker demo + robot (EA) + candles + History page  |  waxba lama lumo: journal + outbox + state + recovery
  */
-const fs = require('fs'), path = require('path'), http = require('http'), zlib = require('zlib'), os = require('os');
+const fs = require('fs'), path = require('path'), http = require('http'), zlib = require('zlib'), os = require('os'), crypto = require('crypto');
 const XLSX = require('xlsx');
 const { createDatabase } = require('./database');
 const { appendFileWithRetry } = require('./append-file-retry');
@@ -37,6 +37,15 @@ const CONFIG = {
   weekendClosed: ENV.WEEKEND_CLOSED === '1', keepCsv: ENV.KEEP_CSV === '1', liveXlsx: ENV.LIVE_XLSX_SECONDS === undefined ? 60 : +ENV.LIVE_XLSX_SECONDS, openBrowser: ENV.NO_OPEN !== '1',
   localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 };
+const API_TOKEN = ENV.API_TOKEN || '';
+const API_COOKIE_SECURE = ENV.API_COOKIE_SECURE === '1';
+if (API_TOKEN && API_TOKEN.length < 32) throw new Error('API_TOKEN must be at least 32 characters; generate a unique random value before starting the terminal.');
+if (!['127.0.0.1', '::1', 'localhost', '[::1]'].includes(CONFIG.host) && !API_COOKIE_SECURE) {
+  throw new Error('Remote terminal binding requires API_COOKIE_SECURE=1 behind a trusted HTTPS reverse proxy.');
+}
+const API_SESSION_COOKIE = 'itr_terminal_session', API_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+const API_LOGIN_WINDOW_MS = 15 * 60 * 1000, API_LOGIN_MAX_ATTEMPTS = 8;
+const apiSessions = new Map(), apiLoginAttempts = new Map();
 const SYMBOLS = (ENV.SYMBOLS || Object.keys(SYM_DEFS).join(',')).split(',').map(s => s.trim().toUpperCase().replace('/', '')).filter(s => SYM_DEFS[s]);
 const log = (k, m) => console.log(`[${fmtDT(new Date())}] [${k}] ${m}`);
 const readLines = f => fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
@@ -453,6 +462,47 @@ async function syncHistoryToDatabase() {
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
 const json = (s, o, code) => { if (code) s.statusCode = code; s.setHeader('Content-Type', 'application/json'); s.setHeader('Cache-Control', 'no-store'); s.end(JSON.stringify(o)) };
 const readBody = q => new Promise(res => { let b = ''; q.on('data', c => { b += c; if (b.length > 1e6) q.destroy() }); q.on('end', () => { try { res(JSON.parse(b || '{}')) } catch (e) { res({}) } }) });
+const PUBLIC_READS = new Set(['/prices', '/market', '/candles']);
+const PUBLIC_ASSETS = new Set(['/', '/index.html', '/data.html', '/history.html', '/common.js', '/folders.js', '/trader.js', '/data.js', '/history.js', '/ui.css', '/trader.css']);
+const digest = value => crypto.createHash('sha256').update(String(value)).digest();
+const secretMatches = (left, right) => crypto.timingSafeEqual(digest(left), digest(right));
+function terminalSession(q) {
+  const cookie = q.headers.cookie || '';
+  for (const field of cookie.split(';')) {
+    const separator = field.indexOf('=');
+    if (separator < 0 || field.slice(0, separator).trim() !== API_SESSION_COOKIE) continue;
+    const id = field.slice(separator + 1).trim(), session = apiSessions.get(id);
+    if (!session || session.expiresAt <= Date.now()) { apiSessions.delete(id); return false }
+    return true;
+  }
+  return false;
+}
+function authorized(q) {
+  if (!API_TOKEN) return false;
+  const authorization = q.headers.authorization || '';
+  const match = /^Bearer\s+(.+)$/i.exec(authorization);
+  return Boolean(match && secretMatches(match[1], API_TOKEN)) || terminalSession(q);
+}
+function apiCookie(value, maxAge) {
+  return `${API_SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${API_COOKIE_SECURE ? '; Secure' : ''}`;
+}
+function originMatches(q) {
+  if (!q.headers.origin || !q.headers.host) return false;
+  try {
+    const origin = new URL(q.headers.origin);
+    return origin.host.toLowerCase() === q.headers.host.toLowerCase()
+      && (origin.protocol === 'http:' || origin.protocol === 'https:');
+  } catch { return false }
+}
+function allowApiLogin(address) {
+  const now = Date.now(), attempts = (apiLoginAttempts.get(address) || []).filter(at => now - at < API_LOGIN_WINDOW_MS);
+  apiLoginAttempts.set(address, attempts);
+  return attempts.length < API_LOGIN_MAX_ATTEMPTS;
+}
+function denyApiAccess(s) {
+  s.setHeader('WWW-Authenticate', 'Bearer realm="ITR Terminal"');
+  return json(s, { error: 'Authentication is required for this endpoint.' }, 401);
+}
 const prices = () => Object.fromEntries(SYMBOLS.map(k => { const S = SY[k], q = S.eng.quote(), d = S.day || { open: q.bid, high: q.bid, low: q.bid };
   return [k, { label: S.def.label, dig: S.def.dig, bid: q.bid, ask: q.ask, spread: S.eng.sp, dir: q.dir, open: d.open, high: d.high, low: d.low, size: S.def.size, time: S.lastTime }] }));
 const statusAll = () => ({ running: !!timer, symbols: SYMBOLS, datasets: DSN, streams: Object.values(streams).map(s => ({ ds: s.name, sym: s.sym, section: s.ds.section, generated: s.count, sent: s.sent, failed: s.fail,
@@ -466,7 +516,41 @@ const stream = (ds, sym) => streams[String(ds || '').toUpperCase() + ':' + Strin
 http.createServer(async (q, s) => {
   try {
     s.setHeader('Cache-Control', 'no-store');
-    const url = new URL(q.url, 'http://x'), u = decodeURIComponent(url.pathname), p = url.searchParams, post = q.method === 'POST', body = post ? await readBody(q) : {};
+    const url = new URL(q.url, 'http://x'), u = decodeURIComponent(url.pathname), p = url.searchParams, post = q.method === 'POST';
+    const address = q.socket.remoteAddress || 'unknown';
+    if (q.method === 'GET' && u === '/auth/session') return json(s, { authenticated: terminalSession(q), configured: Boolean(API_TOKEN) });
+    if (post && u === '/auth/login') {
+      if (!originMatches(q)) return json(s, { error: 'Request origin was not accepted.' }, 403);
+      if ((q.headers['content-type'] || '').split(';')[0].trim().toLowerCase() !== 'application/json') {
+        return json(s, { error: 'Content-Type must be application/json.' }, 415);
+      }
+      if (!API_TOKEN) return json(s, { error: 'Set API_TOKEN on the terminal server before signing in.' }, 503);
+      if (!allowApiLogin(address)) return json(s, { error: 'Too many sign-in attempts. Wait 15 minutes and try again.' }, 429);
+      apiLoginAttempts.get(address).push(Date.now());
+      const body = await readBody(q);
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return json(s, { error: 'Request must contain a JSON object.' }, 400);
+      if (!secretMatches(body.token || '', API_TOKEN)) return json(s, { error: 'Access credential is incorrect.' }, 401);
+      apiLoginAttempts.delete(address);
+      for (const [id, session] of apiSessions) if (session.expiresAt <= Date.now()) apiSessions.delete(id);
+      const id = crypto.randomBytes(32).toString('base64url');
+      apiSessions.set(id, { expiresAt: Date.now() + API_SESSION_TTL_MS });
+      s.setHeader('Set-Cookie', apiCookie(id, Math.floor(API_SESSION_TTL_MS / 1000)));
+      return json(s, { authenticated: true });
+    }
+    if (post && u === '/auth/logout') {
+      if (!authorized(q)) return denyApiAccess(s);
+      const cookie = q.headers.cookie || '';
+      for (const field of cookie.split(';')) {
+        const separator = field.indexOf('=');
+        if (separator >= 0 && field.slice(0, separator).trim() === API_SESSION_COOKIE) apiSessions.delete(field.slice(separator + 1).trim());
+      }
+      s.setHeader('Set-Cookie', apiCookie('', 0));
+      return json(s, { authenticated: false });
+    }
+    const publicGet = q.method === 'GET' && (PUBLIC_READS.has(u) || PUBLIC_ASSETS.has(u));
+    if (!publicGet && !authorized(q)) return denyApiAccess(s);
+    if (q.method !== 'GET' && !post) return json(s, { error: 'Method not allowed.' }, 405);
+    const body = post ? await readBody(q) : {};
     if (post) {
       if (u === '/start') { startAll(); return s.end('ok') } if (u === '/stop') { stopAll(); return s.end('ok') }
       if (u === '/order') return json(s, broker.place({ ...body, sym: String(body.symbol || body.sym || '').toUpperCase(), magic: 'MANUAL' }));
@@ -479,6 +563,7 @@ http.createServer(async (q, s) => {
       if (u === '/config/setup-done') { cfg.setupDone = true; saveCfg(); return json(s, cfgView()) }
       if (u === '/config/folders') { try { applyFolders(body); return json(s, cfgView()) } catch (e) { return json(s, { error: e.message }, 400) } }
     }
+    if (q.method !== 'GET') return json(s, { error: 'Method not allowed.' }, 405);
     if (u === '/status') return json(s, statusAll());
     if (u === '/db/status') return json(s, { ...dbStatus, table: 'public.itr_market_ticks' });
     if (u === '/prices') return json(s, prices());
@@ -588,7 +673,10 @@ http.createServer(async (q, s) => {
       const [, , dsn, sym, f] = u.split('/'), st = stream(dsn, sym);
       if (!st || !f || f !== path.basename(f)) { s.statusCode = 400; return s.end('bad request') }
       file = path.join(dirOf(st), f); s.setHeader('Content-Disposition', `attachment; filename="${f}"`);
-    } else file = path.join(BASE, 'frontend', 'public', u === '/' ? 'index.html' : path.basename(u));
+    } else {
+      if (!PUBLIC_ASSETS.has(u)) { s.statusCode = 404; return s.end('not found') }
+      file = path.join(BASE, 'frontend', 'public', u === '/' ? 'index.html' : path.basename(u));
+    }
     fs.readFile(file, (e, buf) => { if (e) { s.statusCode = 404; return s.end('not found') }
       s.setHeader('Content-Type', MIME[path.extname(file)] || 'application/octet-stream'); s.end(buf) });
   } catch (e) { json(s, { error: e.message }, 500) }

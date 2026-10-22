@@ -2,6 +2,7 @@
   const $ = id => document.getElementById(id), api = (p, b) => fetch(p, b ? { method: 'POST' } : undefined).then(r => r.json()), n = x => Number(x).toLocaleString(), esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/ /g, '&nbsp;');
   $('start').onclick = () => api('/start', 1); $('stop').onclick = () => api('/stop', 1); let init = false;
   async function refresh() {
+    if (!window.itrHasPrivateAccess()) return;
     try {
       const [s, c] = await Promise.all([api('/status'), api('/config')]); $('conn').textContent = s.running ? '● LIVE' : '■ Stopped'; $('conn').className = 'pill ' + (s.running ? 'on' : 'off');
       if (!init) { $('rsym').innerHTML = s.symbols.map(x => `<option>${x}</option>`).join(''); init = true }
@@ -12,6 +13,13 @@
       $('rth').innerHTML = '<tr>' + r.cols.map(c => `<th>${c}</th>`).join('') + '</tr>'; $('rtb').innerHTML = r.rows.map(x => '<tr>' + r.cols.map(c => `<td>${esc(x[c])}</td>`).join('') + '</tr>').join('');
     } catch (e) { $('conn').textContent = 'offline'; $('conn').className = 'pill off' }
   }
-  async function files() { try { const f = await api('/files'); $('files').innerHTML = Object.entries(f).map(([d, m]) => `<div><b>${d}</b>` + Object.entries(m).map(([sy, l]) => `<details><summary>${sy} <span class="mut">(${l.length})</span></summary>` + l.map(x => `<div><a href="/download/${d}/${sy}/${encodeURIComponent(x.name)}">${x.name}</a> <span class="mut">${(x.size / 1024).toFixed(0)} KB</span></div>`).join('') + '</details>').join('') + '</div>').join('') } catch (e) {} }
-  refresh(); files(); setInterval(refresh, 1000); setInterval(files, 10000); addEventListener('folders-changed', () => setTimeout(refresh, 500));
+  async function files() { if (!window.itrHasPrivateAccess()) return; try { const f = await api('/files'); $('files').innerHTML = Object.entries(f).map(([d, m]) => `<div><b>${d}</b>` + Object.entries(m).map(([sy, l]) => `<details><summary>${sy} <span class="mut">(${l.length})</span></summary>` + l.map(x => `<div><a href="/download/${d}/${sy}/${encodeURIComponent(x.name)}">${x.name}</a> <span class="mut">${(x.size / 1024).toFixed(0)} KB</span></div>`).join('') + '</details>').join('') + '</div>').join('') } catch (e) {} }
+  window.itrAuthReady.then(() => {
+    if (window.itrHasPrivateAccess()) { refresh(); files() }
+    else $('conn').textContent = 'Sign in for private feed controls';
+  });
+  window.addEventListener('itr-authenticated', () => { refresh(); files() });
+  setInterval(() => { if (window.itrHasPrivateAccess()) refresh() }, 1000);
+  setInterval(() => { if (window.itrHasPrivateAccess()) files() }, 10000);
+  addEventListener('folders-changed', () => setTimeout(refresh, 500));
 })();
