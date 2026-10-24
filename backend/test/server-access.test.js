@@ -88,6 +88,12 @@ test('terminal allows public market reads but protects private data, files, and 
   for (const route of ['/', '/index.html', '/data.html', '/history.html', '/common.js']) {
     assert.equal((await request(app.base, route)).status, 200, `${route} remains public`);
   }
+  const historyPage = await (await request(app.base, '/history.html')).text();
+  assert.match(historyPage, /id="d1"/, 'History keeps a custom start date');
+  assert.match(historyPage, /id="d2"/, 'History keeps a custom end date');
+  assert.match(historyPage, /data-q="1h"/, 'History keeps the one-hour quick range');
+  assert.match(historyPage, /data-q="today"/, 'History keeps the all-day quick range');
+  assert.match(historyPage, /id="activity-body"/, 'History includes the live market activity table');
   assert.equal((await request(app.base, '/prices')).status, 200);
   assert.equal((await request(app.base, '/market')).status, 200);
   const publicStatusResponse = await request(app.base, '/public/status');

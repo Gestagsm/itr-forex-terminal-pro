@@ -71,7 +71,7 @@ WHERE dataset = 'TAQ'
 ORDER BY symbol, event_time DESC, sequence_no DESC;
 ```
 
-The History page’s timestamp lookup and TAQ/TAS/GCV date-range search read from PostgreSQL after history synchronization completes.
+The History page’s timestamp lookup and TAQ/TAS/GCV date-range search read from PostgreSQL after history synchronization completes. Its selected dataset/symbol also shows the latest live feed rows, refreshed every two seconds, alongside custom from/to ranges and quick time presets.
 
 ## Features
 
