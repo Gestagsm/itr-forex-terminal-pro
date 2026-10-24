@@ -5,7 +5,7 @@
     if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
     return result;
   }, LIM = 200;
-  let ds = 'TAQ', idx = {}, offset = 0, total = 0, historyReady = false, activityLoading = false;
+  let ds = 'TAQ', idx = {}, offset = 0, total = 0;
   const p2 = n => String(n).padStart(2, '0'), dstr = d => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`, esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/ /g, '&nbsp;');
   const range = () => ({ from: new Date(`${$('d1').value}T${$('t1').value || '00:00:00'}`).getTime(), to: new Date(`${$('d2').value}T${$('t2').value || '23:59:59'}`).getTime() + 1000 });
   const qs = (extra = '') => { const r = range(); return `ds=${ds}&symbol=${$('sym').value}&from=${r.from}&to=${r.to}${extra}` };
@@ -25,10 +25,9 @@
       if (!e.target.dataset.ds) return;
       ds = e.target.dataset.ds;
       document.querySelectorAll('#dsTabs .btn').forEach(b => b.classList.toggle('blue', b.dataset.ds === ds));
-      chips(); run(() => go(0)); run(refreshActivity);
+      chips(); run(() => go(0));
     };
-    $('sym').onchange = () => { chips(); run(() => go(0)); run(refreshActivity) }; chips();
-    historyReady = true; await go(0); await refreshActivity();
+    $('sym').onchange = () => { chips(); run(() => go(0)) }; chips(); await go(0);
   }
   function chips() { const d = idx[ds][$('sym').value].dates; $('chips').innerHTML = d.map(x => `<button class="btn sm" data-d="${x}">${x}</button>`).join(' ') || '<span class="mut">weli ma jiraan</span>';
     $('chips').onclick = e => { if (e.target.dataset.d) { $('d1').value = $('d2').value = e.target.dataset.d; $('t1').value = '00:00:00'; $('t2').value = '23:59:59'; go(0) } } }
@@ -51,20 +50,6 @@
       return `<tr><td>${esc(x.name || `${ds} · ${$('sym').value}`)}</td><td>${esc(x.start)}</td><td>${esc(x.end)}</td><td>${x.size === undefined ? '—' : kb(x.size)}</td><td>${x.live ? '<span class="pill on">LIVE</span>' : '<span class="pill">archived</span>'}</td><td>${fileDetails}</td></tr>`;
     }).join('') || '<tr><td colspan="6" class="mut" style="padding:14px;text-align:center">Block ma jiro maalintan</td></tr>';
   }
-  async function refreshActivity() {
-    if (!historyReady || activityLoading) return;
-    activityLoading = true;
-    try {
-      const result = await api(`/public/recent?ds=${encodeURIComponent(ds)}&symbol=${encodeURIComponent($('sym').value)}`);
-      $('activity-state').textContent = `${ds} · ${$('sym').value} · LIVE · ${new Date().toLocaleTimeString()}`;
-      $('activity-head').innerHTML = `<tr>${result.cols.map(column => `<th>${esc(column)}</th>`).join('')}</tr>`;
-      $('activity-body').innerHTML = result.rows.slice(0, 10).map(row =>
-        `<tr>${result.cols.map(column => `<td>${esc(row[column])}</td>`).join('')}</tr>`
-      ).join('') || `<tr><td class="mut" colspan="${result.cols.length}">Suuqan weli xog live ah ma soo dirin.</td></tr>`;
-    } finally {
-      activityLoading = false;
-    }
-  }
   $('go').onclick = () => run(() => go(0)); $('prev').onclick = () => run(() => go(Math.max(0, offset - LIM))); $('next').onclick = () => { if (offset + LIM < total) run(() => go(offset + LIM)) };
   document.querySelector('[data-q]').parentElement.onclick = e => { const q = e.target.dataset.q; if (!q) return; const now = new Date(), t = d => `${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
     if (q === '5m' || q === '1h') { const f = new Date(now - (q === '5m' ? 300e3 : 3600e3)); $('d1').value = dstr(f); $('t1').value = t(f); $('d2').value = dstr(now); $('t2').value = t(now) }
@@ -77,7 +62,4 @@
   window.itrAuthReady.then(() => init()).catch(showError);
   window.addEventListener('itr-authenticated', () => run(init));
   window.addEventListener('itr-logged-out', () => run(init));
-  setInterval(() => {
-    if (document.visibilityState === 'visible') run(refreshActivity);
-  }, 2000);
 })();
