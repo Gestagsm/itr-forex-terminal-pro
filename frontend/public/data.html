@@ -1,19 +1,25 @@
 <!DOCTYPE html>
 <html lang="so">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Feed — TAQ · TAS · GCV</title>
-<link rel="stylesheet" href="ui.css"><script src="common.js"></script></head>
+<link rel="stylesheet" href="ui.css?v=20261024-8"><script src="common.js?v=20261024-8"></script></head>
 <body>
 <div class="bar"><div class="logo">📡 LIVE FEED — TAQ · TAS · GCV</div>
-  <div style="display:flex;gap:8px;align-items:center"><span id="conn" class="pill">...</span><button class="btn" data-api-auth type="button" disabled>Private controls unavailable</button><button class="btn green" data-private-control id="start" disabled>▶ Start All</button><button class="btn red" data-private-control id="stop" disabled>■ Stop All</button>
+  <div style="display:flex;gap:8px;align-items:center"><span id="conn" class="pill">Connecting…</span><button class="btn" data-api-auth type="button" disabled>Private controls unavailable</button><button class="btn green" data-private-control id="start" disabled>▶ Start All</button><button class="btn red" data-private-control id="stop" disabled>■ Stop All</button>
   <button class="btn" data-private-control onclick="openFolders()" disabled>📁 Folders</button><a class="btn blue" href="history.html">📜 History</a><a class="btn" href="index.html">⬅ Terminal</a></div></div>
 <div style="padding:14px;display:flex;flex-direction:column;gap:12px;max-width:1500px;margin:auto">
-  <div id="folders" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px"></div>
-  <div class="box"><h3>Streams (dataset × suuq) — mid walba gooni</h3><div class="tw" style="max-height:300px"><table><thead><tr><th>Dataset</th><th>Suuq</th><th>Dhalay</th><th>La diray</th><th>Safka</th><th>Fashil</th><th>Qoritaankii u dambeeyay</th><th>Block</th><th>Excel live</th><th>Excel (4-saac)</th><th>Cillad</th></tr></thead><tbody id="st"></tbody></table></div></div>
-  <div class="box"><h3>Xogta live (30-ka safaf ee u dambeeyay)</h3>
+  <div class="box"><h3>Public read-only market feeds</h3><p class="mut">TAQ Pro, TAS Pro iyo GCV data waa la arki karaa adigoon sign-in samayn. Koonto, trading controls, folders iyo files waxay u baahan yihiin private access.</p><div id="feeds" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px"></div></div>
+  <div class="box"><h3>Xogta live ee la wada arki karo (30-ka saf ee ugu dambeeya)</h3>
     <div class="row"><select id="rds"><option>TAQ</option><option>TAS</option><option>GCV</option></select><select id="rsym"></select>
-      <a class="btn green sm" id="xx">⬇ Export Excel (block-ka hadda)</a><a class="btn sm" id="xc">⬇ CSV</a></div>
+    </div>
     <div class="tw"><table><thead id="rth"></thead><tbody id="rtb"></tbody></table></div></div>
-  <div class="box"><h3>Faylasha (Excel 4-saac + LIVE csv)</h3><div id="files" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px"></div></div>
+  <div id="privateData" hidden>
+    <div id="folders" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px"></div>
+    <div class="box"><h3>Streams (dataset × suuq) — mid walba gooni</h3><div class="tw" style="max-height:300px"><table><thead><tr><th>Dataset</th><th>Suuq</th><th>Dhalay</th><th>La diray</th><th>Safka</th><th>Fashil</th><th>Qoritaankii u dambeeyay</th><th>Block</th><th>Excel live</th><th>Excel (4-saac)</th><th>Cillad</th></tr></thead><tbody id="st"></tbody></table></div></div>
+    <div class="box"><h3>Xogta live (30-ka safaf ee u dambeeyay)</h3>
+      <div class="row"><a class="btn green sm" id="xx">⬇ Export Excel (block-ka hadda)</a><a class="btn sm" id="xc">⬇ CSV</a></div>
+    </div>
+    <div class="box"><h3>Faylasha (Excel 4-saac + LIVE csv)</h3><div id="files" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px"></div></div>
+  </div>
 </div>
-<script src="folders.js"></script><script src="data.js"></script>
+<script src="folders.js?v=20261024-8"></script><script src="data.js?v=20261024-8"></script>
 </body></html>

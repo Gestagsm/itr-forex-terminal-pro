@@ -14,7 +14,7 @@
   if (location.protocol === 'file:') { document.addEventListener('DOMContentLoaded', () => show('<b>Faylkan si toos ah ayaad u furtay (file://).</b> Waa inaad marka hore server-ka shido.')); return }
   const of = window.fetch; let fails = 0, authState = false, authConfigured = false, authPrompt = null;
   const updateAuthButtons = () => document.querySelectorAll('[data-api-auth]').forEach(button => {
-    button.textContent = authState ? 'Sign out' : authConfigured ? 'Sign in for private data' : 'Private controls unavailable';
+    button.textContent = authState ? 'Sign out' : authConfigured ? 'Admin / private access' : 'Private controls unavailable';
     button.disabled = !authState && !authConfigured;
     button.setAttribute('aria-label', authState ? 'Sign out of private terminal access' : 'Sign in for private terminal access');
   });
@@ -33,7 +33,7 @@
       overlay.style.cssText = 'position:fixed;inset:0;background:rgba(8,10,13,.78);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;font-family:Segoe UI,Arial,sans-serif';
       overlay.innerHTML = `<form style="width:min(420px,100%);background:#161b22;border:1px solid #39434d;border-radius:10px;padding:22px;color:#e1e4e6">
         <h2 style="margin:0 0 8px">Private terminal access</h2>
-        <p style="color:#9aa6b2;font-size:13px">Enter the API_TOKEN configured by the terminal operator. Public market prices and charts do not require sign-in.</p>
+        <p style="color:#9aa6b2;font-size:13px">Enter the API_TOKEN configured by the terminal operator. Market prices, charts, and TAQ Pro / TAS Pro / GCV live feeds are public read-only. Sign-in is only for account data, controls, configuration, and private files.</p>
         <label for="itr-api-token">Access credential</label>
         <input id="itr-api-token" type="password" autocomplete="current-password" required style="display:block;box-sizing:border-box;width:100%;margin:6px 0 10px;padding:10px;background:#0c0f12;color:#e1e4e6;border:1px solid #39434d;border-radius:5px">
         <div data-auth-error role="alert" style="min-height:18px;color:#ff6b81;font-size:13px;margin-bottom:8px"></div>
@@ -90,7 +90,50 @@
     try { return new URL(typeof input === 'string' ? input : input.url, location.href).pathname }
     catch { return '' }
   }
+  async function updatePublicFeedStatus() {
+    const databaseStatus = document.getElementById('dbstat'), feedStatus = document.getElementById('fstat');
+    if (!databaseStatus && !feedStatus) return;
+    const setBadge = (target, label, state, title) => {
+      const badge = document.createElement('span');
+      badge.className = `fp ${state}`;
+      badge.textContent = label;
+      badge.title = title;
+      target.appendChild(badge);
+    };
+    try {
+      const response = await of('/public/status', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const status = await response.json();
+      if (databaseStatus) {
+        databaseStatus.replaceChildren();
+        setBadge(databaseStatus, `DB ${status.connected ? '✓' : '✖'}`, status.connected ? 'ok' : 'bad',
+          status.connected ? 'PostgreSQL connected' : 'PostgreSQL disconnected');
+      }
+      if (feedStatus) {
+        feedStatus.replaceChildren();
+        for (const dataset of ['TAQ', 'TAS', 'GCV']) {
+          const feed = status.feeds.find(item => item.ds === dataset);
+          const fresh = feed?.freshness === 'fresh';
+          const label = feed?.freshness === 'fresh' ? '✓' : feed?.freshness === 'paused' ? 'Ⅱ' : '✖';
+          const detail = feed?.freshness || 'unavailable';
+          setBadge(feedStatus, `${dataset} ${label}`, fresh ? 'ok' : 'bad',
+            `${dataset}: ${detail}${feed?.updatedAt ? ` · ${feed.updatedAt}` : ''}`);
+        }
+      }
+    } catch (error) {
+      if (databaseStatus) {
+        databaseStatus.replaceChildren();
+        setBadge(databaseStatus, 'DB ?', '', `Database status unavailable: ${error.message}`);
+      }
+      if (feedStatus) {
+        feedStatus.replaceChildren();
+        for (const dataset of ['TAQ', 'TAS', 'GCV']) setBadge(feedStatus, `${dataset} ?`, '', 'Feed status unavailable');
+      }
+    }
+  }
   document.addEventListener('DOMContentLoaded', () => {
+    updatePublicFeedStatus();
+    setInterval(updatePublicFeedStatus, 2000);
     document.querySelectorAll('[data-api-auth]').forEach(button => button.addEventListener('click', async () => {
       if (!authState) return requestAccess();
       try {

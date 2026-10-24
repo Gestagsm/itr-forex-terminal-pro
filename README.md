@@ -42,7 +42,7 @@ The backend serves static assets from `frontend/public` and exposes the JSON end
 
 ### Public market view and protected controls
 
-The terminal pages, current simulated prices, market sessions, and candles are available without signing in. Account/order/robot status, all mutations, configuration, filesystem browsing, saved feed/history data, and exports/downloads require application-level authentication. When `API_TOKEN` is configured, enter it with **Sign in for private data**; the server exchanges it for an expiring HttpOnly, SameSite session cookie. The standalone admin portal forwards this credential only from its server-side proxy. The browser never stores the API token.
+The terminal pages, current simulated prices, market sessions, candles, and read-only TAQ Pro / TAS Pro / GCV feed summaries, recent rows, and bounded historical market queries are available without signing in. The public history API returns only market rows and sanitized time-block metadata; CSV exports, file listings/downloads, account/order/robot status, all mutations, configuration, and filesystem browsing require application-level authentication. The public feed status distinguishes live market generation from the PostgreSQL connection; “Database connected” is only shown when the configured database is initialized and has not reported a failed write. When `API_TOKEN` is configured, use **Admin / private access**; the server exchanges it for an expiring HttpOnly, SameSite session cookie. The standalone admin portal forwards this credential only from its server-side proxy. The browser never stores the API token.
 
 Set a unique random `API_TOKEN` of at least 32 characters in the private `.env` file to enable private features. If it is absent, public market reads continue to work but sign-in is unavailable and private endpoints remain denied. `HOST` must remain loopback for plain HTTP; binding to a remote interface requires `API_COOKIE_SECURE=1` behind a trusted HTTPS reverse proxy. Keep Cloudflare Access enabled as an additional outer access layer; this application configuration does not change Cloudflare policy or deployment settings.
 
@@ -107,7 +107,7 @@ Set environment variables before starting the server:
 | `BLOCK_MINUTES` | `240` | Data-feed archive interval |
 | `LIVE_XLSX_SECONDS` | `60` | Live workbook refresh interval; `0` disables it |
 | `NO_OPEN` | unset | Set to `1` to avoid opening a browser automatically |
-| `API_TOKEN` | unset | User-generated credential (minimum 32 characters) for private terminal, admin, config, history, and file endpoints |
+| `API_TOKEN` | unset | User-generated credential (minimum 32 characters) for private terminal, admin, config, history exports, and file endpoints |
 | `API_COOKIE_SECURE` | unset | Set to `1` behind a trusted HTTPS reverse proxy; required when `HOST` is not loopback |
 
 ## Standalone administration portal

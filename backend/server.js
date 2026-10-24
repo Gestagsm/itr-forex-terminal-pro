@@ -392,6 +392,9 @@ function queryHistory(s, from, to, offset, limit) {
 }
 const histIndex = () => Object.fromEntries(DSN.map(n => [n, Object.fromEntries(SYMBOLS.map(k => { const bl = listBlocks(streams[n + ':' + k]);
   return [k, { blocks: bl.length, dates: [...new Set(bl.map(b => dayKey(b.start)))] }] }))]));
+const publicHistoryBlocks = (s, date) => listBlocks(s)
+  .filter(block => !date || dayKey(block.start) === date)
+  .map(block => ({ start: fmtDT(new Date(block.start)), end: fmtDT(new Date(block.end)), live: !block.gz }));
 
 /* Blocks already imported are tracked by size+mtime; only new/changed blocks are read (inserts stay deduped by the DB). */
 const IMPORT_MARK = path.join(CONFIG.historyDir, '.broker', 'db-import.json');
@@ -461,8 +464,15 @@ async function syncHistoryToDatabase() {
 /* ---------- API + frontend ---------- */
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
 const json = (s, o, code) => { if (code) s.statusCode = code; s.setHeader('Content-Type', 'application/json'); s.setHeader('Cache-Control', 'no-store'); s.end(JSON.stringify(o)) };
+const historyFailure = (s, error) => {
+  log('HISTORY', `Market history request failed: ${error.message}`);
+  return json(s, { error: 'Market history is temporarily unavailable.' }, 503);
+};
 const readBody = q => new Promise(res => { let b = ''; q.on('data', c => { b += c; if (b.length > 1e6) q.destroy() }); q.on('end', () => { try { res(JSON.parse(b || '{}')) } catch (e) { res({}) } }) });
-const PUBLIC_READS = new Set(['/prices', '/market', '/candles']);
+const PUBLIC_READS = new Set([
+  '/prices', '/market', '/candles', '/public/status', '/public/recent',
+  '/history/index', '/history/at', '/history/query', '/public/history/blocks'
+]);
 const PUBLIC_ASSETS = new Set(['/', '/index.html', '/data.html', '/history.html', '/common.js', '/folders.js', '/trader.js', '/data.js', '/history.js', '/ui.css', '/trader.css']);
 const digest = value => crypto.createHash('sha256').update(String(value)).digest();
 const secretMatches = (left, right) => crypto.timingSafeEqual(digest(left), digest(right));
@@ -505,6 +515,20 @@ function denyApiAccess(s) {
 }
 const prices = () => Object.fromEntries(SYMBOLS.map(k => { const S = SY[k], q = S.eng.quote(), d = S.day || { open: q.bid, high: q.bid, low: q.bid };
   return [k, { label: S.def.label, dig: S.def.dig, bid: q.bid, ask: q.ask, spread: S.eng.sp, dir: q.dir, open: d.open, high: d.high, low: d.low, size: S.def.size, time: S.lastTime }] }));
+const publicStatus = () => ({
+  connected: Boolean(database && dbStatus.connected && dbStatus.historySynced),
+  marketRunning: Boolean(timer),
+  feeds: DSN.map(ds => {
+    const latest = SYMBOLS.map(sym => streams[ds + ':' + sym].recent.at(-1))
+      .filter(Boolean).map(row => row._eventTime).sort().pop() || null;
+    const age = latest ? Date.now() - Date.parse(latest) : Infinity;
+    return {
+      ds,
+      freshness: !timer ? 'paused' : age <= 10000 ? 'fresh' : latest ? 'stale' : 'waiting',
+      updatedAt: latest
+    };
+  })
+});
 const statusAll = () => ({ running: !!timer, symbols: SYMBOLS, datasets: DSN, streams: Object.values(streams).map(s => ({ ds: s.name, sym: s.sym, section: s.ds.section, generated: s.count, sent: s.sent, failed: s.fail,
   queued: s.queue.length, files: s.files, block: s.cur ? baseName(s, s.cur) : '-', lastWrite: s.lastWrite, csvError: s.csvError, xlsxAt: s.xlsxAt, xlsxError: s.xlsxError, lastError: s.lastError, folder: dirOf(s) })), database: dbStatus });
 const cfgView = () => ({ setupDone: !!cfg.setupDone, folders: Object.fromEntries(DSN.map(n => [n, { path: rootOf(n), custom: !!cfg.folders[n] }])), platform: process.platform, keepCsv: CONFIG.keepCsv, blockMinutes: CONFIG.blockMinutes });
@@ -547,7 +571,8 @@ http.createServer(async (q, s) => {
       s.setHeader('Set-Cookie', apiCookie('', 0));
       return json(s, { authenticated: false });
     }
-    const publicGet = q.method === 'GET' && (PUBLIC_READS.has(u) || PUBLIC_ASSETS.has(u));
+    const publicGet = q.method === 'GET' && (PUBLIC_ASSETS.has(u)
+      || PUBLIC_READS.has(u) && !(u === '/history/query' && p.get('format') === 'csv'));
     if (!publicGet && !authorized(q)) return denyApiAccess(s);
     if (q.method !== 'GET' && !post) return json(s, { error: 'Method not allowed.' }, 405);
     const body = post ? await readBody(q) : {};
@@ -565,6 +590,13 @@ http.createServer(async (q, s) => {
     }
     if (q.method !== 'GET') return json(s, { error: 'Method not allowed.' }, 405);
     if (u === '/status') return json(s, statusAll());
+    if (u === '/public/status') return json(s, publicStatus());
+    if (u === '/public/recent') {
+      const st = stream(p.get('ds'), p.get('symbol'));
+      if (!st) return json(s, { error: 'ds + symbol' }, 400);
+      const rows = st.recent.slice(-30).reverse().map(row => Object.fromEntries(st.ds.cols.map(column => [column, row[column]])));
+      return json(s, { ds: st.name, symbol: st.sym, cols: st.ds.cols, rows });
+    }
     if (u === '/db/status') return json(s, { ...dbStatus, table: 'public.itr_market_ticks' });
     if (u === '/prices') return json(s, prices());
     if (u === '/market') return json(s, M.market(new Date(), CONFIG.weekendClosed));
@@ -576,46 +608,69 @@ http.createServer(async (q, s) => {
     if (u === '/curve') return json(s, broker.curve());
     if (u === '/robot') return json(s, { ...robot.status(), config: robot.config(), defaults: robot.DEFAULTS });
     if (u === '/recent') { const st = stream(p.get('ds'), p.get('symbol')); if (!st) return json(s, { error: 'ds + symbol' }, 400); return json(s, { cols: st.ds.cols, rows: st.recent.slice().reverse() }) }
-    if (u === '/history/index') return json(s, dbStatus.historySynced
-      ? await database.historyIndex(SYMBOLS, CONFIG.localTimezone)
-      : histIndex());
+    if (u === '/public/history/blocks') {
+      const st = stream(p.get('ds'), p.get('symbol'));
+      if (!st) return json(s, { error: 'ds + symbol' }, 400);
+      return json(s, publicHistoryBlocks(st, p.get('date')));
+    }
+    if (u === '/history/index') {
+      try {
+        return json(s, dbStatus.historySynced
+          ? await database.historyIndex(SYMBOLS, CONFIG.localTimezone)
+          : histIndex());
+      } catch (error) { return historyFailure(s, error) }
+    }
     if (u === '/history/blocks') {                                      // ?ds=TAQ&symbol=EURUSD&date=YYYY-MM-DD
       const st = stream(p.get('ds'), p.get('symbol')); if (!st) return json(s, { error: 'ds + symbol' }, 400);
       return json(s, listBlocks(st).filter(b => !p.get('date') || dayKey(b.start) === p.get('date')).map(b => ({ name: b.name, start: fmtDT(new Date(b.start)), end: fmtDT(new Date(b.end)), live: !b.gz, size: fs.statSync(b.file).size, xlsx: fs.existsSync(path.join(dirOf(st), outName(st, b.start, b.end) + '.xlsx')) ? outName(st, b.start, b.end) + '.xlsx' : null })));
     }
     if (u === '/history/at') {                                          // ?time=<epoch|YYYY-MM-DDTHH:MM:SS>  -> rate-ka suuq kasta waqtigaas (quote-kii u dambeeyay <= time)
-      const t = pt(p.get('time') || '') || Date.now(), out = {};
-      if (dbStatus.historySynced) {
-        const quotes = await database.latestQuotesAt(new Date(t), SYMBOLS);
-        for (const k of SYMBOLS) {
-          const quote = quotes[k];
-          out[k] = quote ? { time: fmtDT(new Date(quote.time)), bid: quote.bid, ask: quote.ask, dir: quote.dir, label: SYM_DEFS[k].label, dig: SYM_DEFS[k].dig } : null;
+      try {
+        const requestedTime = p.get('time'), t = requestedTime ? pt(requestedTime) : Date.now(), out = {};
+        if (!Number.isFinite(t)) return json(s, { error: 'time ma saxna' }, 400);
+        if (dbStatus.historySynced) {
+          const quotes = await database.latestQuotesAt(new Date(t), SYMBOLS);
+          for (const k of SYMBOLS) {
+            const quote = quotes[k];
+            out[k] = quote ? { time: fmtDT(new Date(quote.time)), bid: quote.bid, ask: quote.ask, dir: quote.dir, label: SYM_DEFS[k].label, dig: SYM_DEFS[k].dig } : null;
+          }
+          return json(s, { time: fmtDT(new Date(t)), source: 'postgresql', rates: out });
         }
-        return json(s, { time: fmtDT(new Date(t)), source: 'postgresql', rates: out });
-      }
-      for (const k of SYMBOLS) { const st = streams['TAQ:' + k]; out[k] = null;
-        for (const b of listBlocks(st).filter(x => x.start <= t).reverse().slice(0, 3)) { let hit = null;
-          for (const r of readBlock(b)) { if (rowTime(r, b) <= t) hit = r; else break }
-          if (hit) { out[k] = { time: hit.Timestamp, bid: hit.BID, ask: hit.ASK, dir: hit.PRCTCK_1, label: SYM_DEFS[k].label, dig: SYM_DEFS[k].dig }; break } } }
-      return json(s, { time: fmtDT(new Date(t)), source: 'local-history', rates: out });
+        for (const k of SYMBOLS) { const st = streams['TAQ:' + k]; out[k] = null;
+          for (const b of listBlocks(st).filter(x => x.start <= t).reverse().slice(0, 3)) { let hit = null;
+            for (const r of readBlock(b)) { if (rowTime(r, b) <= t) hit = r; else break }
+            if (hit) { out[k] = { time: hit.Timestamp, bid: hit.BID, ask: hit.ASK, dir: hit.PRCTCK_1, label: SYM_DEFS[k].label, dig: SYM_DEFS[k].dig }; break } } }
+        return json(s, { time: fmtDT(new Date(t)), source: 'local-history', rates: out });
+      } catch (error) { return historyFailure(s, error) }
     }
     if (u === '/history/query') {                                       // ?ds&symbol&from&to&offset&limit&format=csv
-      const st = stream(p.get('ds'), p.get('symbol')); if (!st) return json(s, { error: 'ds + symbol' }, 400);
-      const from = p.get('from') ? pt(p.get('from')) : 0, to = p.get('to') ? pt(p.get('to')) : Date.now() + 86400e3, csv = p.get('format') === 'csv';
-      let r, source;
-      if (dbStatus.historySynced) {
-        const result = await database.queryHistory(st.name, st.sym, new Date(from), new Date(to), csv ? 0 : +p.get('offset') || 0, csv ? 1e6 : Math.min(+p.get('limit') || 200, 2000));
-        r = { cols: st.ds.cols, rows: result.rows.map(row => st.ds.cols.map(column => row[column])), total: result.total,
-          first: result.first ? fmtDT(new Date(result.first)) : null, last: result.last ? fmtDT(new Date(result.last)) : null };
-        source = 'postgresql';
-      } else {
-        r = queryHistory(st, from, to, csv ? 0 : +p.get('offset') || 0, csv ? 1e6 : Math.min(+p.get('limit') || 200, 2000));
-        source = 'local-history';
-      }
-      if (csv) { const esc = v => { v = String(v); return /[",\n]|^\s|\s$/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v };
-        s.setHeader('Content-Type', 'text/csv; charset=utf-8'); s.setHeader('Content-Disposition', `attachment; filename="${st.name}_${st.sym}_history.csv"`);
-        return s.end('\ufeff' + r.cols.join(',') + '\n' + r.rows.map(x => x.map(esc).join(',')).join('\n')) }
-      return json(s, { ...r, source });
+      try {
+        const st = stream(p.get('ds'), p.get('symbol')); if (!st) return json(s, { error: 'ds + symbol' }, 400);
+        const from = p.has('from') ? pt(p.get('from')) : 0, to = p.has('to') ? pt(p.get('to')) : Date.now() + 86400e3;
+        const csv = p.get('format') === 'csv';
+        const offset = p.has('offset') ? Number(p.get('offset')) : 0;
+        const requestedLimit = p.has('limit') ? Number(p.get('limit')) : 200;
+        if (!Number.isFinite(from) || !Number.isFinite(to) || !(from < to)
+          || !Number.isSafeInteger(offset) || offset < 0 || offset > 1000000
+          || !Number.isSafeInteger(requestedLimit) || requestedLimit < 1) {
+          return json(s, { error: 'from/to/offset/limit ma saxna' }, 400);
+        }
+        const limit = Math.min(requestedLimit, 2000);
+        let r, source;
+        if (dbStatus.historySynced) {
+          const result = await database.queryHistory(st.name, st.sym, new Date(from), new Date(to), csv ? 0 : offset, csv ? 1e6 : limit);
+          r = { cols: st.ds.cols, rows: result.rows.map(row => st.ds.cols.map(column => row[column])), total: result.total,
+            first: result.first ? fmtDT(new Date(result.first)) : null, last: result.last ? fmtDT(new Date(result.last)) : null };
+          source = 'postgresql';
+        } else {
+          r = queryHistory(st, from, to, csv ? 0 : offset, csv ? 1e6 : limit);
+          source = 'local-history';
+        }
+        if (csv) { const esc = v => { v = String(v); return /[",\n]|^\s|\s$/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v };
+          s.setHeader('Content-Type', 'text/csv; charset=utf-8'); s.setHeader('Content-Disposition', `attachment; filename="${st.name}_${st.sym}_history.csv"`);
+          return s.end('\ufeff' + r.cols.join(',') + '\n' + r.rows.map(x => x.map(esc).join(',')).join('\n')) }
+        return json(s, { ...r, source });
+      } catch (error) { return historyFailure(s, error) }
     }
     if (u === '/candles') {                                             // ?symbol&tf&limit | &from&to | &format=csv
       const S = SY[(p.get('symbol') || '').toUpperCase()], tf = (p.get('tf') || 'M1').toUpperCase();

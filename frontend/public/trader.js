@@ -97,9 +97,6 @@
   };
   let cfgC = null;
   async function fstat() { if (!window.itrHasPrivateAccess()) return; try { const [s, c] = await Promise.all([api('/status'), api('/config')]); cfgC = c;
-    $('dbstat').innerHTML = `<span class="fp ${s.database.historySynced ? 'ok' : 'bad'}">${s.database.historySynced ? 'DB ✓' : 'DB ✖'}</span>`;
-    $('fstat').innerHTML = s.datasets.map(d => { const st = s.streams.filter(x => x.ds === d), last = st.map(x => x.lastWrite).filter(Boolean).sort().pop() || '', er = st.find(x => x.csvError), ok = last && Date.now() - new Date().setHours(...last.split(':').map(Number), 0) < 8000 && !er;
-      return `<span class="fp ${ok ? 'ok' : 'bad'}" title="${c.folders[d].path}${er ? ' — ' + er.csvError : ''}">${d} ${ok ? '✓ ' + last : '✖'}</span>` }).join('');
     if (!c.setupDone && !window.__setupShown) { window.__setupShown = true; openFolders(true) } } catch (e) {} }
   setInterval(() => { if (window.itrHasPrivateAccess()) fstat() }, 2000);
 
@@ -107,7 +104,7 @@
     const s = A;
     $('metrics').innerHTML = (s.authenticated
       ? [['Balance', money(s.balance)], ['Equity', money(s.equity)], ['Floating P/L', `<span class="${cls(s.floating)}">${money(s.floating)}</span>`], ['Margin', money(s.margin)], ['Free Margin', money(s.free)], ['Margin Level', s.level === null ? '—' : s.level.toFixed(0) + '%']]
-      : [['Account', 'Sign in for private data']]).map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join('');
+      : [['Account', 'Sign in for account controls']]).map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join('');
     $('watch').innerHTML = Object.entries(P).map(([k, p]) => { const ch = (p.bid - p.open) / p.open * 100, pb = prevBid[k], c = pb === undefined ? '' : p.bid > pb ? 'up' : p.bid < pb ? 'down' : ''; prevBid[k] = p.bid;
       const ps = A.positions.filter(x => x.sym === k), pl = ps.reduce((a, x) => a + x.pnl, 0);
       return `<div class="pair ${k === sym ? 'active' : ''}" data-s="${k}"><b>${p.label}</b><span class="px ${c}">${p.bid.toFixed(p.dig)}</span><span class="px mut">${p.ask.toFixed(p.dig)}</span><span class="${cls(ch)}" style="text-align:right">${ch >= 0 ? '+' : ''}${ch.toFixed(2)}%</span>${ps.length ? `<span class="pl"><span>● ${ps.length} position</span><b class="${cls(pl)}">${pl >= 0 ? '+' : ''}${money(pl)}</b></span>` : ''}</div>` }).join('');

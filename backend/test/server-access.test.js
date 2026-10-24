@@ -90,16 +90,71 @@ test('terminal allows public market reads but protects private data, files, and 
   }
   assert.equal((await request(app.base, '/prices')).status, 200);
   assert.equal((await request(app.base, '/market')).status, 200);
+  const publicStatusResponse = await request(app.base, '/public/status');
+  assert.equal(publicStatusResponse.status, 200);
+  const publicStatus = await publicStatusResponse.json();
+  assert.equal(publicStatus.connected, false, 'connected remains false when PostgreSQL is not configured');
+  assert.equal(publicStatus.marketRunning, true, 'marketRunning reflects the running market generator');
+  assert.deepEqual(publicStatus.feeds.map(feed => feed.ds).sort(), ['GCV', 'TAQ', 'TAS']);
+  assert.equal(publicStatus.feeds.every(feed => ['fresh', 'stale', 'waiting', 'paused'].includes(feed.freshness)), true);
+  assert.equal(publicStatus.feeds.every(feed => Object.keys(feed).sort().join(',') === 'ds,freshness,updatedAt'), true);
+  assert.equal(Object.keys(publicStatus).sort().join(','), 'connected,feeds,marketRunning');
+  for (const ds of ['TAQ', 'TAS', 'GCV']) {
+    const recent = await request(app.base, `/public/recent?ds=${ds}&symbol=EURUSD`);
+    assert.equal(recent.status, 200, `${ds} latest feed is public`);
+    const data = await recent.json();
+    assert.equal(data.ds, ds);
+    assert.equal(data.symbol, 'EURUSD');
+    assert.ok(Array.isArray(data.cols));
+    assert.ok(Array.isArray(data.rows));
+    assert.equal(data.rows.some(row => '_eventTime' in row || '_sequence' in row), false);
+  }
+  assert.equal((await request(app.base, '/public/recent?ds=INVALID&symbol=EURUSD')).status, 400);
+  const publicHistoryIndex = await request(app.base, '/history/index');
+  assert.equal(publicHistoryIndex.status, 200);
+  assert.ok((await publicHistoryIndex.json()).TAQ.EURUSD);
+  assert.equal((await request(app.base, '/history/at?time=0')).status, 200);
+  assert.equal((await request(app.base, '/history/at?time=not-a-time')).status, 400);
+  const historicalRows = await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&from=0&to=4102444800000&limit=2');
+  assert.equal(historicalRows.status, 200);
+  const historyData = await historicalRows.json();
+  assert.ok(Array.isArray(historyData.rows));
+  assert.ok(historyData.rows.length <= 2);
+  assert.ok(historyData.rows.every(row => row.length === historyData.cols.length));
+  assert.equal((await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&from=0&to=4102444800000&limit=-1')).status, 400);
+  assert.equal((await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&from=0&to=4102444800000&offset=-1')).status, 400);
+  const publicBlocks = await request(app.base, '/public/history/blocks?ds=TAQ&symbol=EURUSD');
+  assert.equal(publicBlocks.status, 200);
+  const blockData = await publicBlocks.json();
+  assert.equal(Array.isArray(blockData), true);
+  for (const block of blockData) {
+    assert.deepEqual(Object.keys(block).sort(), ['end', 'live', 'start']);
+  }
+  const csvHistory = await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&format=csv');
+  assert.equal(csvHistory.status, 401, 'history export remains private');
   const candles = await request(app.base, '/candles?symbol=EURUSD&limit=2');
   assert.equal(candles.status, 200);
   assert.equal((await candles.json()).symbol, 'EURUSD');
   assert.deepEqual(await (await request(app.base, '/auth/session')).json(), { authenticated: false, configured: true });
+  const demoCookie = `${encodeURIComponent('itr_terminal_session')}=demo-user-session`;
+  for (const route of [
+    '/', '/index.html', '/data.html', '/history.html', '/common.js',
+    '/prices', '/market', '/candles?symbol=EURUSD&limit=2', '/public/status',
+    '/public/recent?ds=TAQ&symbol=EURUSD', '/history/index', '/history/at?time=0',
+    '/history/query?ds=TAQ&symbol=EURUSD&from=0&to=4102444800000&limit=2',
+    '/public/history/blocks?ds=TAQ&symbol=EURUSD'
+  ]) {
+    assert.equal((await request(app.base, route, { cookie: demoCookie })).status, 200, `${route} is public with a non-operator cookie`);
+  }
+  assert.equal((await request(app.base, '/account', { cookie: demoCookie })).status, 401);
+  assert.equal((await request(app.base, '/order', {
+    method: 'POST', cookie: demoCookie, body: { symbol: 'EURUSD', side: 'BUY', lots: 1 }
+  })).status, 401);
 
   const privateReads = [
-    '/status', '/db/status', '/account', '/trades', '/curve', '/robot', '/config',
-    '/fs/list', '/files', '/recent?ds=TAQ&symbol=EURUSD', '/history/index',
-    '/history/at?time=0', '/history/blocks?ds=TAQ&symbol=EURUSD',
-    '/history/query?ds=TAQ&symbol=EURUSD', '/export/TAQ/EURUSD',
+    '/status', '/db/status', '/account', '/trades', '/curve', '/robot', '/config', '/files',
+    '/fs/list', '/recent?ds=TAQ&symbol=EURUSD', '/history/blocks?ds=TAQ&symbol=EURUSD',
+    '/history/query?ds=TAQ&symbol=EURUSD&format=csv', '/export/TAQ/EURUSD',
     '/download/TAQ/EURUSD/private.xlsx'
   ];
   for (const route of privateReads) assert.equal((await request(app.base, route)).status, 401, `${route} is private`);
@@ -123,6 +178,14 @@ test('terminal allows public market reads but protects private data, files, and 
   assert.match(login.headers.get('set-cookie'), /SameSite=Strict/);
   const cookie = login.headers.get('set-cookie').split(';', 1)[0];
   assert.deepEqual(await (await request(app.base, '/auth/session', { cookie })).json(), { authenticated: true, configured: true });
+  for (const route of [
+    '/', '/index.html', '/data.html', '/history.html', '/common.js', '/folders.js',
+    '/trader.js', '/data.js', '/history.js', '/ui.css', '/trader.css',
+    '/prices', '/market', '/candles?symbol=EURUSD&limit=2', '/public/status',
+    '/public/recent?ds=TAQ&symbol=EURUSD'
+  ]) {
+    assert.equal((await request(app.base, route, { cookie })).status, 200, `${route} remains public with a session cookie`);
+  }
   assert.equal((await request(app.base, '/account', { cookie })).status, 200);
   assert.equal((await request(app.base, '/robot/config', {
     method: 'POST', cookie, body: { enabled: false }
