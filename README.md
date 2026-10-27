@@ -38,7 +38,7 @@ history/          Runtime state and generated data (created on first run)
 .env.example      PostgreSQL connection template; copy to .env and set local credentials
 ```
 
-The backend serves static assets from `frontend/public` and exposes the JSON endpoints consumed by that UI. It creates a `public.itr_market_ticks` table in PostgreSQL and automatically uses a TimescaleDB hypertable when the extension is enabled. Both this terminal and your other project can connect to the same database and read the same tick history.
+The backend serves static assets from `frontend/public` and exposes the JSON endpoints consumed by that UI. It creates a `public.itr_market_ticks` table in PostgreSQL and automatically uses a TimescaleDB hypertable when the extension is enabled. Both this terminal and your other project can connect to the same database and read the same tick history. When the frontend is hosted on GitHub Pages, its public market/history reads use the configured ITR backend origin; the backend permits browser reads only from `https://gestagsm.github.io` for allowlisted, read-only endpoints. The backend must be running and reachable for those pages to load market history.
 
 ### Public market view and protected controls
 

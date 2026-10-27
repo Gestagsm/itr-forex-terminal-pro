@@ -1,6 +1,6 @@
 (() => {
   const $ = id => document.getElementById(id), api = async p => {
-    const response = await fetch(p, { cache: 'no-store' });
+    const response = await fetch(`${window.itrPublicApiBase || ''}${p}`, { cache: 'no-store' });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
     return result;

@@ -12,6 +12,7 @@
   document.addEventListener('DOMContentLoaded', () => document.body.appendChild(ov));
   const show = m => { ov.style.display = 'flex'; ov.querySelector('#ovmsg').innerHTML = m || '' }, hide = () => { ov.style.display = 'none' };
   if (location.protocol === 'file:') { document.addEventListener('DOMContentLoaded', () => show('<b>Faylkan si toos ah ayaad u furtay (file://).</b> Waa inaad marka hore server-ka shido.')); return }
+  window.itrPublicApiBase = location.hostname === 'gestagsm.github.io' ? 'https://itr.iibshe.com' : '';
   const of = window.fetch; let fails = 0, authState = false, authConfigured = false, authPrompt = null;
   const updateAuthButtons = () => document.querySelectorAll('[data-api-auth]').forEach(button => {
     button.textContent = authState ? 'Sign out' : authConfigured ? 'Admin / private access' : 'Private controls unavailable';
@@ -101,7 +102,7 @@
       target.appendChild(badge);
     };
     try {
-      const response = await of('/public/status', { cache: 'no-store' });
+      const response = await of(`${window.itrPublicApiBase}/public/status`, { cache: 'no-store' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const status = await response.json();
       if (databaseStatus) {

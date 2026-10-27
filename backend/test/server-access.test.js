@@ -69,12 +69,13 @@ async function startTerminal(t, { token = API_TOKEN } = {}) {
   return { base, close };
 }
 
-function request(base, route, { method = 'GET', body, cookie } = {}) {
+function request(base, route, { method = 'GET', body, cookie, origin } = {}) {
   const headers = {};
   if (method === 'POST') {
     headers['Content-Type'] = 'application/json';
     headers.Origin = base;
   }
+  if (origin) headers.Origin = origin;
   if (cookie) headers.Cookie = cookie;
   return fetch(`${base}${route}`, {
     method,
@@ -119,6 +120,13 @@ test('terminal allows public market reads but protects private data, files, and 
   const publicHistoryIndex = await request(app.base, '/history/index');
   assert.equal(publicHistoryIndex.status, 200);
   assert.ok((await publicHistoryIndex.json()).TAQ.EURUSD);
+  const pagesHistoryIndex = await request(app.base, '/history/index', { origin: 'https://gestagsm.github.io' });
+  assert.equal(pagesHistoryIndex.status, 200);
+  assert.equal(pagesHistoryIndex.headers.get('access-control-allow-origin'), 'https://gestagsm.github.io');
+  assert.equal(pagesHistoryIndex.headers.get('vary'), 'Origin');
+  const foreignHistoryIndex = await request(app.base, '/history/index', { origin: 'https://untrusted.example' });
+  assert.equal(foreignHistoryIndex.status, 200);
+  assert.equal(foreignHistoryIndex.headers.get('access-control-allow-origin'), null);
   assert.equal((await request(app.base, '/history/at?time=0')).status, 200);
   assert.equal((await request(app.base, '/history/at?time=not-a-time')).status, 400);
   const historicalRows = await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&from=0&to=4102444800000&limit=2');
@@ -138,6 +146,11 @@ test('terminal allows public market reads but protects private data, files, and 
   }
   const csvHistory = await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&format=csv');
   assert.equal(csvHistory.status, 401, 'history export remains private');
+  const pagesCsvHistory = await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&format=csv', {
+    origin: 'https://gestagsm.github.io'
+  });
+  assert.equal(pagesCsvHistory.status, 401, 'cross-origin history export remains private');
+  assert.equal(pagesCsvHistory.headers.get('access-control-allow-origin'), null);
   const candles = await request(app.base, '/candles?symbol=EURUSD&limit=2');
   assert.equal(candles.status, 200);
   assert.equal((await candles.json()).symbol, 'EURUSD');
@@ -164,6 +177,9 @@ test('terminal allows public market reads but protects private data, files, and 
     '/download/TAQ/EURUSD/private.xlsx'
   ];
   for (const route of privateReads) assert.equal((await request(app.base, route)).status, 401, `${route} is private`);
+  const pagesPrivateData = await request(app.base, '/account', { origin: 'https://gestagsm.github.io' });
+  assert.equal(pagesPrivateData.status, 401);
+  assert.equal(pagesPrivateData.headers.get('access-control-allow-origin'), null);
 
   const mutations = [
     ['/start', {}], ['/stop', {}], ['/order', { symbol: 'EURUSD', side: 'BUY', lots: 1 }],

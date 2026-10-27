@@ -473,6 +473,7 @@ const PUBLIC_READS = new Set([
   '/prices', '/market', '/candles', '/public/status', '/public/recent',
   '/history/index', '/history/at', '/history/query', '/public/history/blocks'
 ]);
+const PUBLIC_CORS_ORIGINS = new Set(['https://gestagsm.github.io']);
 const PUBLIC_ASSETS = new Set(['/', '/index.html', '/data.html', '/history.html', '/common.js', '/folders.js', '/trader.js', '/data.js', '/history.js', '/ui.css', '/trader.css']);
 const digest = value => crypto.createHash('sha256').update(String(value)).digest();
 const secretMatches = (left, right) => crypto.timingSafeEqual(digest(left), digest(right));
@@ -542,6 +543,13 @@ http.createServer(async (q, s) => {
     s.setHeader('Cache-Control', 'no-store');
     const url = new URL(q.url, 'http://x'), u = decodeURIComponent(url.pathname), p = url.searchParams, post = q.method === 'POST';
     const address = q.socket.remoteAddress || 'unknown';
+    const corsOrigin = q.headers.origin;
+    if (q.method === 'GET' && PUBLIC_READS.has(u)
+      && !(u === '/history/query' && p.get('format') === 'csv')
+      && PUBLIC_CORS_ORIGINS.has(corsOrigin)) {
+      s.setHeader('Access-Control-Allow-Origin', corsOrigin);
+      s.setHeader('Vary', 'Origin');
+    }
     if (q.method === 'GET' && u === '/auth/session') return json(s, { authenticated: terminalSession(q), configured: Boolean(API_TOKEN) });
     if (post && u === '/auth/login') {
       if (!originMatches(q)) return json(s, { error: 'Request origin was not accepted.' }, 403);
