@@ -129,11 +129,17 @@ test('terminal allows public market reads but protects private data, files, and 
   assert.equal(foreignHistoryIndex.headers.get('access-control-allow-origin'), null);
   assert.equal((await request(app.base, '/history/at?time=0')).status, 200);
   assert.equal((await request(app.base, '/history/at?time=not-a-time')).status, 400);
-  const historicalRows = await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&from=0&to=4102444800000&limit=2');
-  assert.equal(historicalRows.status, 200);
-  const historyData = await historicalRows.json();
+  let historyData;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const historicalRows = await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&from=0&to=4102444800000&limit=2');
+    assert.equal(historicalRows.status, 200);
+    historyData = await historicalRows.json();
+    if (historyData.rows.length) break;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
   assert.ok(Array.isArray(historyData.rows));
-  assert.ok(historyData.rows.length <= 2);
+  assert.equal(historyData.rows.length, 2, 'local market history remains available when PostgreSQL is not configured');
+  assert.equal(historyData.source, 'local-history');
   assert.ok(historyData.rows.every(row => row.length === historyData.cols.length));
   assert.equal((await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&from=0&to=4102444800000&limit=-1')).status, 400);
   assert.equal((await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&from=0&to=4102444800000&offset=-1')).status, 400);

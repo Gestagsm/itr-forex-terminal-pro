@@ -71,7 +71,7 @@ WHERE dataset = 'TAQ'
 ORDER BY symbol, event_time DESC, sequence_no DESC;
 ```
 
-The History page’s timestamp lookup and TAQ/TAS/GCV date-range search read from PostgreSQL after history synchronization completes. The original History layout supports custom from/to ranges, quick time presets, timestamp quote lookup, and four-hour market-data blocks.
+The History page’s timestamp lookup and TAQ/TAS/GCV date-range search read from PostgreSQL after history synchronization completes. Available local journal/archive dates are included while PostgreSQL import is running, and a query with no matching database rows falls back to the local history files. The original History layout supports custom from/to ranges, quick time presets, timestamp quote lookup, and four-hour market-data blocks.
 
 ## Features
 

@@ -623,9 +623,20 @@ http.createServer(async (q, s) => {
     }
     if (u === '/history/index') {
       try {
-        return json(s, dbStatus.historySynced
-          ? await database.historyIndex(SYMBOLS, CONFIG.localTimezone)
-          : histIndex());
+        const localIndex = histIndex();
+        if (!dbStatus.historySynced) return json(s, localIndex);
+        const databaseIndex = await database.historyIndex(SYMBOLS, CONFIG.localTimezone);
+        for (const dataset of DSN) {
+          for (const symbol of SYMBOLS) {
+            const local = localIndex[dataset][symbol], stored = databaseIndex[dataset][symbol];
+            const dates = [...new Set([...(stored.dates || []), ...local.dates])].sort();
+            databaseIndex[dataset][symbol] = {
+              blocks: stored.blocks || local.blocks,
+              dates
+            };
+          }
+        }
+        return json(s, databaseIndex);
       } catch (error) { return historyFailure(s, error) }
     }
     if (u === '/history/blocks') {                                      // ?ds=TAQ&symbol=EURUSD&date=YYYY-MM-DD
@@ -667,9 +678,15 @@ http.createServer(async (q, s) => {
         let r, source;
         if (dbStatus.historySynced) {
           const result = await database.queryHistory(st.name, st.sym, new Date(from), new Date(to), csv ? 0 : offset, csv ? 1e6 : limit);
-          r = { cols: st.ds.cols, rows: result.rows.map(row => st.ds.cols.map(column => row[column])), total: result.total,
-            first: result.first ? fmtDT(new Date(result.first)) : null, last: result.last ? fmtDT(new Date(result.last)) : null };
-          source = 'postgresql';
+          if (result.total > 0) {
+            r = { cols: st.ds.cols, rows: result.rows.map(row => st.ds.cols.map(column => row[column])), total: result.total,
+              first: result.first ? fmtDT(new Date(result.first)) : null, last: result.last ? fmtDT(new Date(result.last)) : null };
+            source = 'postgresql';
+          } else {
+            const local = queryHistory(st, from, to, csv ? 0 : offset, csv ? 1e6 : limit);
+            r = local.total > 0 ? local : { ...local, cols: st.ds.cols };
+            source = local.total > 0 ? 'local-history' : 'postgresql';
+          }
         } else {
           r = queryHistory(st, from, to, csv ? 0 : offset, csv ? 1e6 : limit);
           source = 'local-history';
