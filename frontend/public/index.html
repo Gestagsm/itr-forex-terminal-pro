@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#101820">
   <meta name="description" content="ITR simulated forex trading terminal">
   <title>ITR Terminal · Simulated Markets</title>
-  <link rel="stylesheet" href="ui.css?v=20261009-5">
-  <link rel="stylesheet" href="trader.css?v=20261009-5">
-  <script src="common.js?v=20261009-5"></script>
+  <link rel="stylesheet" href="ui.css?v=20261024-8">
+  <link rel="stylesheet" href="trader.css?v=20261024-8">
+  <script src="common.js?v=20261024-8"></script>
 </head>
 <body>
   <header class="topbar">
@@ -21,8 +21,9 @@
       <span id="fstat" class="feed-status" aria-label="Feed status"></span>
       <span id="dbstat" aria-label="Database status"></span>
       <span id="conn" class="pill" role="status">Connecting…</span>
-      <button class="btn robot-control" id="robotBtn" type="button">Robot</button>
-      <button class="btn" onclick="openFolders()" type="button">Folders</button>
+      <button class="btn robot-control" id="robotBtn" data-private-control type="button" disabled>Robot</button>
+      <button class="btn" data-api-auth type="button" disabled>Private controls unavailable</button>
+      <button class="btn" data-private-control onclick="openFolders()" type="button" disabled>Folders</button>
       <a class="btn" href="history.html">History</a>
       <a class="btn" href="data.html">Data feed</a>
     </nav>
@@ -36,8 +37,9 @@
         <div id="watch" class="watch-list" aria-label="Available simulated markets"></div>
       </section>
 
-      <section class="box ticket">
+      <section class="box ticket private-controls">
         <div class="section-heading"><div><span class="eyebrow">TRADE</span><h2>Order ticket <span class="muted">· <span id="tsym">—</span></span></h2></div><span class="demo-tag">DEMO</span></div>
+        <p class="risk-note">Sign in for private account and trading controls. Public prices and charts remain available without sign-in.</p>
         <div class="irow"><label for="otype">Order type</label><select id="otype"><option value="MARKET">Market</option><option value="LIMIT">Limit</option><option value="STOP">Stop</option></select></div>
         <div class="irow" id="prow" style="display:none"><label for="oprice">Entry price</label><input id="oprice" type="number" step="any"></div>
         <div class="irow"><label for="olots">Volume (lots)</label><input id="olots" type="number" value="0.10" step="0.01" min="0.01" max="100"></div>
@@ -73,7 +75,7 @@
         <div class="cwrap"><canvas id="cv" aria-label="Simulated market candlestick chart"></canvas><div id="ohlc"></div></div>
       </section>
 
-      <section class="box bottom">
+      <section class="box bottom private-controls">
         <div class="bottom-heading"><div><span class="eyebrow">ACCOUNT</span><h2>Trading activity</h2></div>
           <div class="tabs" id="tabs" role="tablist">
             <span data-t="pos" class="on" role="tab">Positions</span>
@@ -87,7 +89,7 @@
       </section>
     </section>
   </main>
-  <script src="folders.js?v=20261009-4"></script>
-  <script src="trader.js?v=20261009-5"></script>
+  <script src="folders.js?v=20261024-8"></script>
+  <script src="trader.js?v=20261024-8"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 (() => {
   const $ = id => document.getElementById(id), TFS = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1'];
-  let sym = 'EURUSD', tf = 'M5', N = 120, P = {}, A = { positions: [], orders: [], stats: {} }, C = [], dig = 5, tab = 'pos', R = null, hover = -1, prevBid = {}, G = null;
+  let sym = 'EURUSD', tf = 'M5', N = 120, P = {}, A = { authenticated: false, positions: [], orders: [], stats: {} }, C = [], dig = 5, tab = 'pos', R = null, hover = -1, prevBid = {}, G = null;
   let chartRange = null, replayIndex = -1, replayTimer = null, chartRequest = 0;
   const chartTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const api = (p, b) => fetch(p, b ? { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) } : { cache: 'no-store' }).then(r => r.json());
@@ -20,8 +20,11 @@
     if (refreshInFlight) { refreshPending = true; return }
     refreshInFlight = true;
     try {
-      const [p, a] = await Promise.all([api('/prices'), api('/account')]);
-      P = p; A = a;
+      P = await api('/prices');
+      if (window.itrHasPrivateAccess()) {
+        const account = await api('/account');
+        A = account.error ? { authenticated: false, positions: [], orders: [], stats: {} } : { ...account, authenticated: true };
+      } else A = { authenticated: false, positions: [], orders: [], stats: {} };
       $('conn').textContent = '● LIVE'; $('conn').className = 'pill on'; render();
     } catch (e) { $('conn').textContent = 'offline'; $('conn').className = 'pill off' }
     finally {
@@ -93,16 +96,15 @@
     }, 500);
   };
   let cfgC = null;
-  async function fstat() { try { const [s, c] = await Promise.all([api('/status'), api('/config')]); cfgC = c;
-    $('dbstat').innerHTML = `<span class="fp ${s.database.historySynced ? 'ok' : 'bad'}">${s.database.historySynced ? 'DB ✓' : 'DB ✖'}</span>`;
-    $('fstat').innerHTML = s.datasets.map(d => { const st = s.streams.filter(x => x.ds === d), last = st.map(x => x.lastWrite).filter(Boolean).sort().pop() || '', er = st.find(x => x.csvError), ok = last && Date.now() - new Date().setHours(...last.split(':').map(Number), 0) < 8000 && !er;
-      return `<span class="fp ${ok ? 'ok' : 'bad'}" title="${c.folders[d].path}${er ? ' — ' + er.csvError : ''}">${d} ${ok ? '✓ ' + last : '✖'}</span>` }).join('');
+  async function fstat() { if (!window.itrHasPrivateAccess()) return; try { const [s, c] = await Promise.all([api('/status'), api('/config')]); cfgC = c;
     if (!c.setupDone && !window.__setupShown) { window.__setupShown = true; openFolders(true) } } catch (e) {} }
-  setInterval(fstat, 2000); fstat();
+  setInterval(() => { if (window.itrHasPrivateAccess()) fstat() }, 2000);
 
   function render() {
     const s = A;
-    $('metrics').innerHTML = [['Balance', money(s.balance)], ['Equity', money(s.equity)], ['Floating P/L', `<span class="${cls(s.floating)}">${money(s.floating)}</span>`], ['Margin', money(s.margin)], ['Free Margin', money(s.free)], ['Margin Level', s.level === null ? '—' : s.level.toFixed(0) + '%']].map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join('');
+    $('metrics').innerHTML = (s.authenticated
+      ? [['Balance', money(s.balance)], ['Equity', money(s.equity)], ['Floating P/L', `<span class="${cls(s.floating)}">${money(s.floating)}</span>`], ['Margin', money(s.margin)], ['Free Margin', money(s.free)], ['Margin Level', s.level === null ? '—' : s.level.toFixed(0) + '%']]
+      : [['Account', 'Sign in for account controls']]).map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join('');
     $('watch').innerHTML = Object.entries(P).map(([k, p]) => { const ch = (p.bid - p.open) / p.open * 100, pb = prevBid[k], c = pb === undefined ? '' : p.bid > pb ? 'up' : p.bid < pb ? 'down' : ''; prevBid[k] = p.bid;
       const ps = A.positions.filter(x => x.sym === k), pl = ps.reduce((a, x) => a + x.pnl, 0);
       return `<div class="pair ${k === sym ? 'active' : ''}" data-s="${k}"><b>${p.label}</b><span class="px ${c}">${p.bid.toFixed(p.dig)}</span><span class="px mut">${p.ask.toFixed(p.dig)}</span><span class="${cls(ch)}" style="text-align:right">${ch >= 0 ? '+' : ''}${ch.toFixed(2)}%</span>${ps.length ? `<span class="pl"><span>● ${ps.length} position</span><b class="${cls(pl)}">${pl >= 0 ? '+' : ''}${money(pl)}</b></span>` : ''}</div>` }).join('');
@@ -134,6 +136,10 @@
   const cards = o => `<div class="cards">${o.map(([k, v, c]) => `<div>${k}<b class="${c || ''}">${v}</b></div>`).join('')}</div>`;
   async function renderTab(force) {
     const el = $('tabc');
+    if (!A.authenticated && ['his', 'sta', 'rob'].includes(tab)) {
+      el.innerHTML = '<div class="mut" style="padding:16px">Sign in to view private account history and robot data.</div>';
+      return;
+    }
     if (tab === 'pos') el.innerHTML = `<div style="margin-bottom:6px"><button class="btn sm red" data-act="closeall">Close All</button></div><table><thead><tr><th>ID</th><th>Symbol</th><th>Type</th><th>Lots</th><th>Open</th><th>Price</th><th>SL</th><th>TP</th><th>P/L</th><th>By</th><th></th></tr></thead><tbody>` +
       (A.positions.map(p => `<tr><td>#${p.id}</td><td>${label(p.sym)}</td><td class="${p.side === 'BUY' ? 'up' : 'down'}">${p.side}</td><td>${p.lots}</td><td>${fx(p.sym, p.open)}</td><td>${fx(p.sym, p.price)}</td><td>${p.sl ? fx(p.sym, p.sl) : '-'}</td><td>${p.tp ? fx(p.sym, p.tp) : '-'}</td><td class="${cls(p.pnl)}">${money(p.pnl)}</td><td>${p.magic === 'EA' ? '<span class="tag">EA</span>' : 'manual'}</td><td><button class="btn sm" data-act="edit" data-id="${p.id}">✎</button> <button class="btn sm red" data-act="close" data-id="${p.id}">✕</button></td></tr>`).join('') || '<tr><td colspan="11" class="mut" style="text-align:center;padding:16px">Position furan ma jiro</td></tr>') + '</tbody></table>';
     else if (tab === 'ord') el.innerHTML = `<table><thead><tr><th>ID</th><th>Symbol</th><th>Type</th><th>Lots</th><th>Price</th><th>SL</th><th>TP</th><th></th></tr></thead><tbody>` +
@@ -186,5 +192,16 @@
   cv.onwheel = e => { e.preventDefault(); N = Math.max(30, Math.min(400, N + (e.deltaY > 0 ? 15 : -15))); if (!chartRange) loadChart() };
   addEventListener('resize', draw);
   (async () => { const m = await api('/market'); $('sess').innerHTML = m.sessions.map(s => `<span class="pill ${s.open ? 'on' : ''}" title="${s.name}">${s.name[0] + (s.name === 'New York' ? 'Y' : s.name.slice(1, 3))}</span>`).join('') })();
-  api('/robot').then(r => { R = r; botBtn() }); renderTab(true);
+  window.addEventListener('itr-authenticated', () => {
+    loop();
+    fstat();
+    api('/robot').then(r => { if (!r.error) { R = r; botBtn() } });
+    renderTab(true);
+  });
+  window.itrAuthReady.then(() => {
+    if (!window.itrHasPrivateAccess()) return;
+    fstat();
+    api('/robot').then(r => { if (!r.error) { R = r; botBtn() } });
+  });
+  renderTab(true);
 })();

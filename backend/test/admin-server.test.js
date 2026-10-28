@@ -11,6 +11,7 @@ const options = port => ({
   username: 'itr-operator',
   password: 'test-password-with-more-than-14-characters',
   terminalUrl: 'http://127.0.0.1:4100',
+  apiToken: 'admin-proxy-test-token-with-at-least-thirty-two-characters',
   host: '127.0.0.1',
   port,
   cookieSecure: false
@@ -61,7 +62,12 @@ test('admin service requires credentials and protects remote binding', () => {
 test('standalone admin sign-in protects status and robot controls and logout revokes session', async t => {
   const proxied = [];
   const app = await startAdmin(async (url, init) => {
-    proxied.push({ path: new URL(url).pathname, method: init.method, body: init.body && JSON.parse(init.body) });
+    proxied.push({
+      path: new URL(url).pathname,
+      method: init.method,
+      body: init.body && JSON.parse(init.body),
+      authorization: new Headers(init.headers).get('authorization')
+    });
     const data = new URL(url).pathname === '/robot/config'
       ? { enabled: JSON.parse(init.body).enabled, tf: 'M5', symbols: [], stats: {} }
       : { running: true, streams: [], symbols: ['EURUSD'], datasets: ['TAQ'], database: { historySynced: true } };
@@ -103,6 +109,7 @@ test('standalone admin sign-in protects status and robot controls and logout rev
   const cookie = setCookie.split(';', 1)[0];
   assert.equal((await request(app.base, '/api/session', { cookie })).status, 200);
   assert.equal((await request(app.base, '/api/status', { cookie })).status, 200);
+  assert.equal(proxied[0].authorization, `Bearer ${options(0).apiToken}`);
 
   const robotResponse = await request(app.base, '/api/robot/config', {
     method: 'POST', cookie, body: { enabled: false }

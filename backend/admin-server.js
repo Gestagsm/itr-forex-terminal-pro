@@ -224,7 +224,10 @@ function createAdminServer(options, upstreamFetch = fetch) {
     try {
       const response = await upstreamFetch(new URL(endpoint, terminal), {
         method, cache: 'no-store', signal: controller.signal,
-        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        headers: {
+          ...(body ? { 'Content-Type': 'application/json' } : {}),
+          ...(options.apiToken ? { Authorization: `Bearer ${options.apiToken}` } : {})
+        },
         body: body ? JSON.stringify(body) : undefined
       });
       const data = await response.json();
@@ -407,6 +410,7 @@ if (require.main === module) {
     username: process.env.ADMIN_USERNAME || '',
     password: process.env.ADMIN_PASSWORD || '',
     terminalUrl: process.env.ADMIN_TERMINAL_URL || 'http://127.0.0.1:4100',
+    apiToken: process.env.API_TOKEN || '',
     port,
     host,
     cookieSecure: process.env.ADMIN_COOKIE_SECURE === '1'
