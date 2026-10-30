@@ -7,6 +7,7 @@ const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const XLSX = require('xlsx');
 
 const ROOT = path.resolve(__dirname, '../..');
 const API_TOKEN = 'unit-test-api-token-with-at-least-thirty-two-characters';
@@ -150,13 +151,23 @@ test('terminal allows public market reads but protects private data, files, and 
   for (const block of blockData) {
     assert.deepEqual(Object.keys(block).sort(), ['end', 'live', 'start']);
   }
-  const csvHistory = await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&format=csv');
-  assert.equal(csvHistory.status, 401, 'history export remains private');
-  const pagesCsvHistory = await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&format=csv', {
+  const csvHistory = await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&from=0&to=4102444800000&format=csv');
+  assert.equal(csvHistory.status, 200, 'CSV history export is public');
+  assert.match(csvHistory.headers.get('content-disposition'), /attachment; filename="TAQ_EURUSD_history\.csv"/);
+  assert.match(await csvHistory.text(), /^Timestamp,/);
+  const pagesCsvHistory = await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&from=0&to=4102444800000&format=csv', {
     origin: 'https://gestagsm.github.io'
   });
-  assert.equal(pagesCsvHistory.status, 401, 'cross-origin history export remains private');
-  assert.equal(pagesCsvHistory.headers.get('access-control-allow-origin'), null);
+  assert.equal(pagesCsvHistory.status, 200, 'cross-origin CSV history export is public');
+  assert.equal(pagesCsvHistory.headers.get('access-control-allow-origin'), 'https://gestagsm.github.io');
+  const pagesXlsxHistory = await request(app.base, '/history/query?ds=TAQ&symbol=EURUSD&from=0&to=4102444800000&format=xlsx', {
+    origin: 'https://gestagsm.github.io'
+  });
+  assert.equal(pagesXlsxHistory.status, 200, 'cross-origin Excel history export is public');
+  assert.equal(pagesXlsxHistory.headers.get('content-type'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  assert.match(pagesXlsxHistory.headers.get('content-disposition'), /attachment; filename="TAQ_EURUSD_history\.xlsx"/);
+  const historyWorkbook = XLSX.read(Buffer.from(await pagesXlsxHistory.arrayBuffer()), { type: 'buffer' });
+  assert.deepEqual(XLSX.utils.sheet_to_json(historyWorkbook.Sheets.Sheet1, { header: 1 })[0], historyData.cols);
   const candles = await request(app.base, '/candles?symbol=EURUSD&limit=2');
   assert.equal(candles.status, 200);
   assert.equal((await candles.json()).symbol, 'EURUSD');
@@ -179,7 +190,7 @@ test('terminal allows public market reads but protects private data, files, and 
   const privateReads = [
     '/status', '/db/status', '/account', '/trades', '/curve', '/robot', '/config', '/files',
     '/fs/list', '/recent?ds=TAQ&symbol=EURUSD', '/history/blocks?ds=TAQ&symbol=EURUSD',
-    '/history/query?ds=TAQ&symbol=EURUSD&format=csv', '/export/TAQ/EURUSD',
+    '/export/TAQ/EURUSD',
     '/download/TAQ/EURUSD/private.xlsx'
   ];
   for (const route of privateReads) assert.equal((await request(app.base, route)).status, 401, `${route} is private`);

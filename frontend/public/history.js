@@ -86,7 +86,8 @@
       $('tb').innerHTML = r.rows.map(x => '<tr>' + x.map(v => `<td>${esc(v)}</td>`).join('') + '</tr>').join('') || `<tr><td class="mut" colspan="${r.cols.length}" style="padding:20px;text-align:center">Xog lagama helin waqtigan</td></tr>`;
       $('sum').innerHTML = `<b>${ds} · ${$('sym').value}</b> — <b>${total.toLocaleString()}</b> safaf · ${r.source === 'postgresql' ? 'PostgreSQL' : 'kayd maxalli ah'} ${r.first ? `· ${r.first} → ${r.last}` : ''}`;
       $('pg').textContent = total ? `${offset + 1}–${Math.min(offset + LIM, total)} / ${total.toLocaleString()}` : '';
-      $('csv').href = '/history/query?' + qs('&format=csv');
+      $('csv').href = `${window.itrPublicApiBase || ''}/history/query?` + qs('&format=csv');
+      $('xlsx').href = `${window.itrPublicApiBase || ''}/history/query?` + qs('&format=xlsx');
       setSearchState(total ? `Raadintu way dhammaatay · ${total.toLocaleString()} saf ayaa la helay.` : 'Raadintu way dhammaatay; xog lagama helin waqtigan.');
       try { await blocks() }
       catch (error) { $('bl').innerHTML = `<tr><td colspan="6" class="err">Faahfaahinta block-yada lama heli karo: ${esc(error.message)}</td></tr>` }

@@ -544,9 +544,7 @@ http.createServer(async (q, s) => {
     const url = new URL(q.url, 'http://x'), u = decodeURIComponent(url.pathname), p = url.searchParams, post = q.method === 'POST';
     const address = q.socket.remoteAddress || 'unknown';
     const corsOrigin = q.headers.origin;
-    if (q.method === 'GET' && PUBLIC_READS.has(u)
-      && !(u === '/history/query' && p.get('format') === 'csv')
-      && PUBLIC_CORS_ORIGINS.has(corsOrigin)) {
+    if (q.method === 'GET' && PUBLIC_READS.has(u) && PUBLIC_CORS_ORIGINS.has(corsOrigin)) {
       s.setHeader('Access-Control-Allow-Origin', corsOrigin);
       s.setHeader('Vary', 'Origin');
     }
@@ -579,8 +577,7 @@ http.createServer(async (q, s) => {
       s.setHeader('Set-Cookie', apiCookie('', 0));
       return json(s, { authenticated: false });
     }
-    const publicGet = q.method === 'GET' && (PUBLIC_ASSETS.has(u)
-      || PUBLIC_READS.has(u) && !(u === '/history/query' && p.get('format') === 'csv'));
+    const publicGet = q.method === 'GET' && (PUBLIC_ASSETS.has(u) || PUBLIC_READS.has(u));
     if (!publicGet && !authorized(q)) return denyApiAccess(s);
     if (q.method !== 'GET' && !post) return json(s, { error: 'Method not allowed.' }, 405);
     const body = post ? await readBody(q) : {};
@@ -666,7 +663,7 @@ http.createServer(async (q, s) => {
       try {
         const st = stream(p.get('ds'), p.get('symbol')); if (!st) return json(s, { error: 'ds + symbol' }, 400);
         const from = p.has('from') ? pt(p.get('from')) : 0, to = p.has('to') ? pt(p.get('to')) : Date.now() + 86400e3;
-        const csv = p.get('format') === 'csv';
+        const format = p.get('format'), csv = format === 'csv', excel = format === 'xlsx', exportAll = csv || excel;
         const offset = p.has('offset') ? Number(p.get('offset')) : 0;
         const requestedLimit = p.has('limit') ? Number(p.get('limit')) : 200;
         if (!Number.isFinite(from) || !Number.isFinite(to) || !(from < to)
@@ -677,23 +674,29 @@ http.createServer(async (q, s) => {
         const limit = Math.min(requestedLimit, 2000);
         let r, source;
         if (dbStatus.historySynced) {
-          const result = await database.queryHistory(st.name, st.sym, new Date(from), new Date(to), csv ? 0 : offset, csv ? 1e6 : limit);
+          const result = await database.queryHistory(st.name, st.sym, new Date(from), new Date(to), exportAll ? 0 : offset, exportAll ? 1e6 : limit);
           if (result.total > 0) {
             r = { cols: st.ds.cols, rows: result.rows.map(row => st.ds.cols.map(column => row[column])), total: result.total,
               first: result.first ? fmtDT(new Date(result.first)) : null, last: result.last ? fmtDT(new Date(result.last)) : null };
             source = 'postgresql';
           } else {
-            const local = queryHistory(st, from, to, csv ? 0 : offset, csv ? 1e6 : limit);
+            const local = queryHistory(st, from, to, exportAll ? 0 : offset, exportAll ? 1e6 : limit);
             r = local.total > 0 ? local : { ...local, cols: st.ds.cols };
             source = local.total > 0 ? 'local-history' : 'postgresql';
           }
         } else {
-          r = queryHistory(st, from, to, csv ? 0 : offset, csv ? 1e6 : limit);
+          r = queryHistory(st, from, to, exportAll ? 0 : offset, exportAll ? 1e6 : limit);
           source = 'local-history';
         }
         if (csv) { const esc = v => { v = String(v); return /[",\n]|^\s|\s$/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v };
           s.setHeader('Content-Type', 'text/csv; charset=utf-8'); s.setHeader('Content-Disposition', `attachment; filename="${st.name}_${st.sym}_history.csv"`);
           return s.end('\ufeff' + r.cols.join(',') + '\n' + r.rows.map(x => x.map(esc).join(',')).join('\n')) }
+        if (excel) {
+          const rows = r.rows.map(row => Object.fromEntries(st.ds.cols.map((column, index) => [column, row[index]])));
+          s.setHeader('Content-Type', MIME['.xlsx']);
+          s.setHeader('Content-Disposition', `attachment; filename="${st.name}_${st.sym}_history.xlsx"`);
+          return s.end(XLSX.write(buildWorkbook(st.ds, rows), { type: 'buffer', bookType: 'xlsx' }));
+        }
         return json(s, { ...r, source });
       } catch (error) { return historyFailure(s, error) }
     }
